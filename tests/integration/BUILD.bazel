@@ -1,0 +1,131 @@
+load(
+    "//ostest:defs.bzl",
+    "uefi_disk_image",
+    "uefi_esp_image",
+    "uefi_test",
+)
+load("@rules_python//python:py_binary.bzl", "py_binary")
+
+package(default_visibility = ["//visibility:private"])
+
+# This action intentionally uses the host Clang/LLD installation. The target is
+# reachable only from the manual real-QEMU smoke test, so the normal test suite
+# remains independent of a cross compiler and system emulator.
+genrule(
+    name = "serial_pass_efi",
+    srcs = ["serial_pass_uefi.c"],
+    outs = ["serial_pass.efi"],
+    cmd = """
+set -eu
+object="$(@D)/.serial_pass.obj"
+clang \
+  --target=x86_64-pc-windows-msvc \
+  -ffreestanding \
+  -fshort-wchar \
+  -mno-red-zone \
+  -fno-stack-protector \
+  -fno-builtin \
+  -Wall \
+  -Wextra \
+  -Werror \
+  -O2 \
+  -c "$(location serial_pass_uefi.c)" \
+  -o "$$object"
+lld-link \
+  /subsystem:efi_application \
+  /entry:efi_main \
+  /nodefaultlib \
+  /machine:x64 \
+  /base:0 \
+  /brepro \
+  "/out:$@" \
+  "$$object"
+rm -f "$$object"
+""",
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+)
+
+uefi_esp_image(
+    name = "real_qemu_esp",
+    arch = "x86_64",
+    efi_binary = ":serial_pass_efi",
+    size_mb = 64,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "OSTEST",
+)
+
+uefi_disk_image(
+    name = "real_qemu_disk",
+    disk_guid = "6cf7f43a-9233-4a8e-94bc-a403df9d9237",
+    esp = ":real_qemu_esp",
+    partition_guid = "91a1cc59-6747-48d8-a87f-67a2f1eb0a81",
+    size_mb = 96,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+)
+
+filegroup(
+    name = "ovmf_code",
+    srcs = glob(
+        ["runtime/OVMF_CODE_4M.fd"],
+        allow_empty = True,
+    ),
+)
+
+filegroup(
+    name = "ovmf_vars",
+    srcs = glob(
+        ["runtime/OVMF_VARS_4M.fd"],
+        allow_empty = True,
+    ),
+)
+
+py_binary(
+    name = "qemu_system_x86_64",
+    srcs = ["qemu_system_x86_64.py"],
+    data = glob(
+        [
+            "runtime/PACKAGES.txt",
+            "runtime/licenses/**",
+            "runtime/root/**",
+        ],
+        allow_empty = True,
+    ),
+    legacy_create_init = 0,
+    main = "qemu_system_x86_64.py",
+    python_version = "3.12",
+)
+
+uefi_test(
+    name = "real_qemu_uefi_smoke_test",
+    size = "small",
+    arch = "x86_64",
+    debugcon = True,
+    disk = ":real_qemu_disk",
+    export_firmware_vars = True,
+    firmware = ":ovmf_code",
+    firmware_vars = ":ovmf_vars",
+    forbidden_markers = ["OSTEST: FAIL"],
+    graphics = True,
+    memory_mb = 128,
+    qemu = ":qemu_system_x86_64",
+    screendump_not_blank = True,
+    success_markers = [
+        "OSTEST: REAL UEFI BOOT",
+        "OSTEST: PASS",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 20,
+)

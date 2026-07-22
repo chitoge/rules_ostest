@@ -1,0 +1,21 @@
+load("@rules_ostest//ostest:defs.bzl", "fat_image", "raw_image")
+
+raw_image(
+    name = "raw",
+    blobs = {"payload.txt": "1KiB"},
+    size_mb = 1,
+)
+
+fat_image(
+    name = "fat",
+    files = {"payload.txt": "config/payload.txt"},
+    size_mb = 64,
+)
+
+filegroup(
+    name = "consumer_smoke",
+    srcs = [
+        ":fat",
+        ":raw",
+    ],
+)

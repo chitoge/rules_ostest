@@ -39,8 +39,8 @@ local_path_override(
 
 ## Requirements
 
-Use Bazel 7.x, 8.x, or 9.x. The module registers a hermetic Python 3.12
-toolchain through `rules_python`.
+Use Bazel 8.7.0 or newer, including Bazel 9.x. The module registers a hermetic
+Python 3.12 toolchain through `rules_python`.
 
 Test targets require declared Bazel targets for:
 
@@ -205,6 +205,11 @@ AArch64 direct boot defaults to `virt,gic-version=2` and `cortex-a53`;
 tests retain `virt` and `max`. These are real QEMU command paths—the repository
 tests them with a QEMU-shaped fixture, while consumers supply and pin the real
 `qemu-system-aarch64` and any firmware labels.
+
+The fast Bazel matrix uses deterministic QEMU-shaped fixtures. CI separately
+stages a declared x86-64 QEMU/OVMF runtime and performs an uncached boot of a
+real generated FAT/GPT UEFI image under TCG. That integration test validates
+serial markers, QMP framebuffer capture, and OVMF variable-store export.
 
 ## Filesystems and images
 
@@ -432,8 +437,9 @@ for a complete BUILD and Python example.
 
 `rules_ostest` is licensed under Apache-2.0. QEMU is a separate,
 consumer-supplied GNU GPL version 2 program: this project executes it as a
-child process and does not link with or redistribute it. Using QEMU for tests
-does not make `rules_ostest` copyleft. Distributing a QEMU binary or firmware
+child process, and the source distribution does not link with or include it.
+Using QEMU for tests does not make `rules_ostest` copyleft. Distributing a QEMU
+binary or firmware
 alongside a product does create separate compliance duties; see
 [THIRD_PARTY.md](THIRD_PARTY.md) for the boundary and upstream references.
 

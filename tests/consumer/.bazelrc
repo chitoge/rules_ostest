@@ -1,0 +1,1 @@
+build --symlink_prefix=/tmp/rules_ostest_consumer_

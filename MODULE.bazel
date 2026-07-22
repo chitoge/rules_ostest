@@ -1,11 +1,12 @@
 module(
     name = "rules_ostest",
     version = "0.1.0",
-    bazel_compatibility = [">=7.0.0"],
+    bazel_compatibility = [">=8.7.0"],
 )
 
 bazel_dep(name = "rules_python", version = "2.2.0")
 bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.2", dev_dependency = True)
 
 # A downloaded python-build-standalone runtime keeps both image actions and
 # QEMU tests independent of the Python installation on an execution worker.

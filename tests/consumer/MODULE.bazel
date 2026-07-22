@@ -1,0 +1,8 @@
+module(name = "rules_ostest_consumer")
+
+bazel_dep(name = "rules_ostest", version = "0.1.0")
+
+local_path_override(
+    module_name = "rules_ostest",
+    path = "../..",
+)
