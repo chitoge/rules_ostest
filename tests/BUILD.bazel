@@ -1,0 +1,420 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
+load(
+    "//ostest:defs.bzl",
+    "gpt_image",
+    "gpt_partition",
+    "mbr_image",
+    "mbr_partition",
+    "platform_uefi_esp_image",
+    "qemu_hostfwd",
+    "qemu_media",
+    "qemu_network",
+    "qemu_scratch_disk",
+    "raw_image",
+    "uefi_disk_image",
+    "uefi_esp_image",
+    "uefi_iso_image",
+    "uefi_lab_test",
+    "uefi_platform_test",
+    "uefi_py_test",
+    "uefi_test",
+    "uefi_vm",
+)
+
+package(default_visibility = ["//visibility:private"])
+
+platform(
+    name = "guest_x86_64",
+    constraint_values = ["@platforms//cpu:x86_64"],
+)
+
+platform(
+    name = "guest_aarch64",
+    constraint_values = ["@platforms//cpu:aarch64"],
+)
+
+uefi_esp_image(
+    name = "sample_esp",
+    arch = "x64",
+    efi_binary = "testdata/dummy.efi",
+    files = {
+        "testdata/config.txt": "config/Long File Name.txt",
+    },
+    size_mb = 64,
+    volume_label = "OSTEST",
+)
+
+platform_uefi_esp_image(
+    name = "platform_aarch64_esp",
+    efi_binary = "testdata/dummy.efi",
+    guest_platform = ":guest_aarch64",
+    size_mb = 64,
+)
+
+uefi_esp_image(
+    name = "sample_esp_copy",
+    arch = "x86_64",
+    efi_binary = "testdata/dummy.efi",
+    files = {
+        "testdata/config.txt": "config/Long File Name.txt",
+    },
+    size_mb = 64,
+    volume_label = "OSTEST",
+)
+
+uefi_disk_image(
+    name = "sample_disk",
+    disk_guid = "6cf7f43a-9233-4a8e-94bc-a403df9d9237",
+    esp = ":sample_esp",
+    partition_guid = "91a1cc59-6747-48d8-a87f-67a2f1eb0a81",
+    size_mb = 96,
+)
+
+uefi_iso_image(
+    name = "sample_iso",
+    esp = ":sample_esp",
+)
+
+mbr_partition(
+    name = "mbr_esp_partition",
+    image = ":sample_esp",
+    patch_fat_hidden_sectors = True,
+    type_id = 0xEF,
+)
+
+mbr_image(
+    name = "sample_mbr_disk",
+    partitions = [":mbr_esp_partition"],
+    size_mb = 96,
+)
+
+uefi_disk_image(
+    name = "sample_disk_copy",
+    disk_guid = "6cf7f43a-9233-4a8e-94bc-a403df9d9237",
+    esp = ":sample_esp_copy",
+    partition_guid = "91a1cc59-6747-48d8-a87f-67a2f1eb0a81",
+    size_mb = 96,
+)
+
+raw_image(
+    name = "sample_raw",
+    blobs = {
+        "testdata/config.txt": "1MiB",
+        "testdata/dummy.efi": "3072s",
+    },
+    size_mb = 2,
+)
+
+gpt_partition(
+    name = "composed_esp_partition",
+    image = ":sample_esp",
+    partition_name = "EFI System",
+    patch_fat_hidden_sectors = True,
+    type_guid = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
+)
+
+gpt_partition(
+    name = "composed_data_partition",
+    image = ":sample_raw",
+    partition_name = "Test Data",
+    type_guid = "0fc63daf-8483-4772-8e79-3d69d8477de4",
+)
+
+gpt_image(
+    name = "sample_composed_disk",
+    partitions = [
+        ":composed_esp_partition",
+        ":composed_data_partition",
+    ],
+    size_mb = 96,
+)
+
+py_test(
+    name = "image_layout_test",
+    size = "small",
+    srcs = ["image_layout_test.py"],
+    args = [
+        "--esp=$(rlocationpath :sample_esp)",
+        "--esp-copy=$(rlocationpath :sample_esp_copy)",
+        "--disk=$(rlocationpath :sample_disk)",
+        "--disk-copy=$(rlocationpath :sample_disk_copy)",
+        "--composed-disk=$(rlocationpath :sample_composed_disk)",
+        "--raw=$(rlocationpath :sample_raw)",
+        "--platform-aarch64-esp=$(rlocationpath :platform_aarch64_esp)",
+        "--iso=$(rlocationpath :sample_iso)",
+        "--mbr=$(rlocationpath :sample_mbr_disk)",
+    ],
+    data = [
+        ":platform_aarch64_esp",
+        ":sample_composed_disk",
+        ":sample_disk",
+        ":sample_disk_copy",
+        ":sample_esp",
+        ":sample_esp_copy",
+        ":sample_iso",
+        ":sample_mbr_disk",
+        ":sample_raw",
+    ],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["@rules_python//python/runfiles"],
+)
+
+py_binary(
+    name = "fake_qemu",
+    srcs = ["fake_qemu.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "fake_advanced_qemu",
+    srcs = ["fake_advanced_qemu.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "fake_host_companion",
+    srcs = ["fake_host_companion.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
+py_test(
+    name = "managed_network_test",
+    srcs = ["managed_network_test.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["//ostest/private:managed_network"],
+)
+
+py_test(
+    name = "qemu_runner_support_test",
+    srcs = ["qemu_runner_support_test.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["//ostest/private:qemu_runner_support"],
+)
+
+py_test(
+    name = "qemu_config_feature_test",
+    srcs = ["qemu_config_feature_test.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["//ostest/python:qemu_testlib"],
+)
+
+py_binary(
+    name = "fake_qmp_qemu",
+    srcs = ["fake_qmp_qemu.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
+uefi_py_test(
+    name = "qemu_session_test",
+    size = "small",
+    srcs = ["qemu_session_test.py"],
+    debugcon = True,
+    disk = ":sample_disk",
+    firmware = "testdata/dummy.efi",
+    firmware_vars = "testdata/config.txt",
+    gdb = True,
+    guest_platform = ":guest_x86_64",
+    main = "qemu_session_test.py",
+    pause_at_start = True,
+    qemu = ":fake_qmp_qemu",
+)
+
+uefi_lab_test(
+    name = "qemu_lab_test",
+    size = "small",
+    srcs = ["qemu_lab_test.py"],
+    main = "qemu_lab_test.py",
+    vms = [
+        uefi_vm(
+            name = "server",
+            arch = "x86_64",
+            disk = ":sample_disk",
+            firmware = "testdata/dummy.efi",
+            networks = [qemu_network("lan")],
+            qemu = ":fake_qmp_qemu",
+            qemu_args = ["--fake-require-net"],
+        ),
+        uefi_vm(
+            name = "client",
+            disk = ":sample_disk",
+            firmware = "testdata/dummy.efi",
+            guest_platform = ":guest_aarch64",
+            networks = [qemu_network("lan")],
+            qemu = ":fake_qmp_qemu",
+            qemu_args = ["--fake-require-net"],
+        ),
+    ],
+)
+
+uefi_test(
+    name = "qemu_runner_fallback_test",
+    size = "small",
+    arch = "aarch64",
+    disk = "testdata/dummy.efi",
+    firmware = "testdata/dummy.efi",
+    firmware_vars = "testdata/config.txt",
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=soft-aarch64"],
+)
+
+uefi_test(
+    name = "qemu_runner_media_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    media = [
+        qemu_media(
+            image = ":sample_iso",
+            interface = "cdrom",
+        ),
+        qemu_media(
+            bootindex = 2,
+            image = ":sample_esp",
+            interface = "usb-storage",
+        ),
+    ],
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=media-x86_64"],
+)
+
+uefi_test(
+    name = "qemu_runner_firmware_exit_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    machine_options = ["smm=on"],
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=firmware-exit-x86_64"],
+    success_exit_codes = [7],
+)
+
+uefi_platform_test(
+    name = "qemu_runner_platform_test",
+    size = "small",
+    disk = "testdata/dummy.efi",
+    firmware = "testdata/dummy.efi",
+    firmware_vars = "testdata/config.txt",
+    guest_platform = ":guest_aarch64",
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=soft-aarch64"],
+)
+
+uefi_test(
+    name = "qemu_runner_require_kvm_test",
+    size = "small",
+    arch = "x86_64",
+    disk = "testdata/dummy.efi",
+    firmware = "testdata/dummy.efi",
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=hard-x86_64"],
+    require_kvm = True,
+)
+
+uefi_test(
+    name = "qemu_runner_kvm_skip_test",
+    size = "small",
+    arch = "x86_64",
+    disk = "testdata/dummy.efi",
+    firmware = "testdata/dummy.efi",
+    kvm_unavailable = "skip",
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=hard-x86_64"],
+    require_kvm = True,
+)
+
+uefi_test(
+    name = "qemu_runner_direct_aarch64_test",
+    size = "small",
+    arch = "aarch64",
+    boot = "direct-kernel",
+    firmware = None,
+    forbidden_markers = ["ADVANCED-FORBIDDEN"],
+    initrd = "testdata/config.txt",
+    kernel = "testdata/dummy.efi",
+    kernel_args = "console=ttyAMA0 ostest.direct=1",
+    media = [
+        qemu_scratch_disk(
+            name = "state",
+            export = True,
+            size_mb = 1,
+        ),
+    ],
+    qemu = ":fake_advanced_qemu",
+    qemu_args = ["--fake-advanced=direct"],
+    success_markers = [
+        "DIRECT-START",
+        "DIRECT-DONE",
+    ],
+)
+
+uefi_test(
+    name = "qemu_runner_phases_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    forbidden_markers = ["PHASE-FORBIDDEN"],
+    phases = [
+        {
+            "markers": ["PHASE-ONE-WRITE"],
+            "then": "reboot",
+        },
+        {
+            "markers": ["PHASE-TWO-READ"],
+        },
+    ],
+    qemu = ":fake_advanced_qemu",
+    qemu_args = ["--fake-advanced=phases"],
+)
+
+uefi_test(
+    name = "qemu_runner_graphics_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    forbidden_markers = ["GRAPHICS-FORBIDDEN"],
+    graphics = True,
+    qemu = ":fake_advanced_qemu",
+    qemu_args = ["--fake-advanced=graphics"],
+    screendump_not_blank = True,
+    success_markers = ["GRAPHICS-READY"],
+)
+
+uefi_test(
+    name = "qemu_runner_hostfwd_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    forbidden_markers = ["NETWORK-FORBIDDEN"],
+    host_companion = ":fake_host_companion",
+    hostfwd = [qemu_hostfwd(
+        name = "grpc",
+        guest = 50051,
+    )],
+    qemu = ":fake_advanced_qemu",
+    qemu_args = ["--fake-advanced=hostfwd"],
+    success_markers = ["NETWORK-READY"],
+)
+
+uefi_test(
+    name = "qemu_runner_hostfwd_exit_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    host_companion = ":fake_host_companion",
+    hostfwd = [qemu_hostfwd(
+        name = "grpc",
+        guest = 50051,
+    )],
+    qemu = ":fake_advanced_qemu",
+    qemu_args = ["--fake-advanced=hostfwd-exit"],
+    success_exit_codes = [7],
+)

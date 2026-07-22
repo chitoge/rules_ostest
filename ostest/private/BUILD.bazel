@@ -1,0 +1,56 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+
+package(default_visibility = ["//visibility:public"])
+
+py_binary(
+    name = "fat_image_tool",
+    srcs = ["fat_image.py"],
+    legacy_create_init = 0,
+    main = "fat_image.py",
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "gpt_image_tool",
+    srcs = ["gpt_image.py"],
+    legacy_create_init = 0,
+    main = "gpt_image.py",
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "raw_image_tool",
+    srcs = ["raw_image.py"],
+    legacy_create_init = 0,
+    main = "raw_image.py",
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "iso_image_tool",
+    srcs = ["iso_image.py"],
+    legacy_create_init = 0,
+    main = "iso_image.py",
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "mbr_image_tool",
+    srcs = ["mbr_image.py"],
+    legacy_create_init = 0,
+    main = "mbr_image.py",
+    python_version = "3.12",
+)
+
+py_library(
+    name = "managed_network",
+    srcs = ["managed_network.py"],
+)
+
+py_library(
+    name = "qemu_runner_support",
+    srcs = ["qemu_runner_support.py"],
+)
+
+exports_files(["qemu_test_runner.py"])

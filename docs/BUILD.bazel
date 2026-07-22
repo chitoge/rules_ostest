@@ -1,0 +1,7 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "debugging-uefi-tests.md",
+    "osdev-uefi-use-cases.md",
+    "testing-platforms-and-composition.md",
+])

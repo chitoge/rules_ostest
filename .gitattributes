@@ -1,0 +1,9 @@
+* text=auto eol=lf
+
+*.efi binary
+*.fat binary
+*.fd binary
+*.gz binary
+*.img binary
+*.iso binary
+*.qcow2 binary

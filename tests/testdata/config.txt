@@ -1,0 +1,2 @@
+serial_baud=115200
+result_protocol=OSTEST
