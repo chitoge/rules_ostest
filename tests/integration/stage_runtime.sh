@@ -21,7 +21,8 @@ done
 ovmf_code=/usr/share/OVMF/OVMF_CODE_4M.fd
 ovmf_vars=/usr/share/OVMF/OVMF_VARS_4M.fd
 qemu_data=/usr/share/qemu
-for required_path in "${ovmf_code}" "${ovmf_vars}" "${qemu_data}"; do
+efi_shell=/usr/share/efi-shell-x64/shellx64.efi
+for required_path in "${ovmf_code}" "${ovmf_vars}" "${qemu_data}" "${efi_shell}"; do
     if [[ ! -e "${required_path}" ]]; then
         echo "required runtime input is missing: ${required_path}" >&2
         exit 1
@@ -34,6 +35,7 @@ rm -rf -- \
     "${runtime_dir}/licenses" \
     "${runtime_dir}/OVMF_CODE_4M.fd" \
     "${runtime_dir}/OVMF_VARS_4M.fd" \
+    "${runtime_dir}/shellx64.efi" \
     "${runtime_dir}/PACKAGES.txt"
 mkdir -p -- "${runtime_root}" "${runtime_dir}/licenses"
 
@@ -77,8 +79,10 @@ mkdir -p -- "${runtime_root}/usr/share/qemu"
 cp -aL -- "${qemu_data}/." "${runtime_root}/usr/share/qemu/"
 cp -L --preserve=mode,timestamps -- "${ovmf_code}" "${runtime_dir}/OVMF_CODE_4M.fd"
 cp -L --preserve=mode,timestamps -- "${ovmf_vars}" "${runtime_dir}/OVMF_VARS_4M.fd"
+cp -L --preserve=mode,timestamps -- "${efi_shell}" "${runtime_dir}/shellx64.efi"
 
-for package_name in qemu-system-x86 qemu-system-common qemu-system-data ovmf; do
+packages=(qemu-system-x86 qemu-system-common qemu-system-data ovmf efi-shell-x64)
+for package_name in "${packages[@]}"; do
     notice="/usr/share/doc/${package_name}/copyright"
     if [[ -f "${notice}" ]]; then
         cp -L -- "${notice}" "${runtime_dir}/licenses/${package_name}.copyright"
@@ -87,7 +91,7 @@ done
 
 if command -v dpkg-query >/dev/null; then
     dpkg-query -W -f='${binary:Package}\t${Version}\n' \
-        qemu-system-x86 qemu-system-common qemu-system-data ovmf \
+        "${packages[@]}" \
         >"${runtime_dir}/PACKAGES.txt"
 else
     qemu-system-x86_64 --version >"${runtime_dir}/PACKAGES.txt"

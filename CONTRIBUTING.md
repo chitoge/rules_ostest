@@ -22,10 +22,11 @@ bazel test //...
 
 The checked-in `.bazelversion` selects the default supported Bazel release.
 Continuous integration exercises the supported Bazel 8 and 9 releases, plus an
-uncached real-QEMU/OVMF smoke test.
+uncached real-QEMU/OVMF/EFI Shell integration test.
 The default local suite uses fake QEMU executables and does not require KVM,
-QEMU, or UEFI firmware. The CI-only smoke target stages its system runtime
-before it runs.
+QEMU, or UEFI firmware. The CI-only integration target stages its system
+runtime and prebuilt EFI Shell before it runs; no EFI build toolchain is
+required.
 
 Do not commit Bazel output symlinks, Python bytecode, generated disk images, or
 real firmware images.

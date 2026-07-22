@@ -92,18 +92,18 @@ jobs:
         with:
           bazelisk-cache: true
           repository-cache: true
-      - name: Install QEMU and UEFI toolchain
+      - name: Install QEMU, OVMF, and EFI Shell
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends clang lld ovmf qemu-system-x86
+          sudo apt-get install --no-install-recommends efi-shell-x64 ovmf qemu-system-x86
       - name: Stage declared QEMU runtime
         run: |
           tests/integration/stage_runtime.sh
           cat tests/integration/runtime/PACKAGES.txt
-      - name: Boot real UEFI image
+      - name: Boot real EFI Shell image
         run: >-
           bazel test
           --lockfile_mode=off
           --nocache_test_results
           --test_output=errors
-          //tests/integration:real_qemu_uefi_smoke_test
+          //tests/integration:real_qemu_efi_shell_test

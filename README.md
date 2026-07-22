@@ -207,9 +207,12 @@ tests them with a QEMU-shaped fixture, while consumers supply and pin the real
 `qemu-system-aarch64` and any firmware labels.
 
 The fast Bazel matrix uses deterministic QEMU-shaped fixtures. CI separately
-stages a declared x86-64 QEMU/OVMF runtime and performs an uncached boot of a
-real generated FAT/GPT UEFI image under TCG. That integration test validates
-serial markers, QMP framebuffer capture, and OVMF variable-store export.
+stages a declared x86-64 QEMU/OVMF runtime and Ubuntu's prebuilt EFI Shell, then
+performs an uncached boot of a real generated FAT/GPT UEFI image under TCG. The
+guest script reads and writes the FAT filesystem and resets the VM; its second
+boot proves persistence across the QMP-observed reset. The same test validates
+ordered serial phases, framebuffer capture, writable-media export, and OVMF
+variable-store export without requiring an EFI build toolchain.
 
 ## Filesystems and images
 
