@@ -21,15 +21,16 @@ bazel test //...
 ```
 
 The checked-in `.bazelversion` selects the default supported Bazel release.
-Continuous integration exercises the supported Bazel 8 and 9 releases, plus an
-uncached real-QEMU/OVMF/EFI Shell integration test.
+Continuous integration exercises the supported Bazel 8 and 9 releases, plus
+uncached real-QEMU integration tests for x86-64 and AArch64. The real matrix
+covers EFI Shell, direct-kernel CirrOS guests, and scripted QMP/GDB control.
 The default local suite uses fake QEMU executables and does not require KVM,
-QEMU, or UEFI firmware. The CI-only integration target stages its system
-runtime and prebuilt EFI Shell before it runs; no EFI build toolchain is
-required.
+QEMU, UEFI firmware, or guest images. The manual integration targets stage
+their system runtime and prebuilt EFI Shell and fetch pinned test-only CirrOS
+inputs through Bazel; no EFI or guest build toolchain is required.
 
-Do not commit Bazel output symlinks, Python bytecode, generated disk images, or
-real firmware images.
+Do not commit Bazel output symlinks, Python bytecode, generated disk images,
+guest operating-system images, or real firmware images.
 
 ## Licensing contributions
 

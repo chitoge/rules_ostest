@@ -259,7 +259,7 @@ def _lfn_entries(name: str, short_name: bytes) -> list[bytes]:
 def _directory_data(directory: Node, volume_label: str, cluster_size: int) -> bytes:
     entries: list[bytes] = []
     if directory.parent is None:
-        label = volume_label.upper().ljust(11).encode("ascii")
+        label = volume_label.ljust(11).encode("ascii")
         entries.append(_short_entry(label, 0x08, 0))
     else:
         entries.append(_short_entry(b".          ", 0x10, directory.first_cluster))
@@ -334,7 +334,7 @@ def _boot_sector(total_sectors: int, fat_sectors: int, volume_label: str, volume
     sector[64] = 0x80
     sector[66] = 0x29
     struct.pack_into("<I", sector, 67, volume_id)
-    sector[71:82] = volume_label.upper().ljust(11).encode("ascii")
+    sector[71:82] = volume_label.ljust(11).encode("ascii")
     sector[82:90] = b"FAT32   "
     sector[510:512] = b"\x55\xAA"
     return bytes(sector)

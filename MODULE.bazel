@@ -9,6 +9,59 @@ bazel_dep(name = "platforms", version = "1.0.0")
 
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.2", dev_dependency = True)
 
+# Small, pinned test-only guest inputs. These repositories are not created when
+# rules_ostest is consumed as a dependency, and no guest image is redistributed
+# in this source tree or its release artifacts.
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_file(
+    name = "cirros_x86_64_disk",
+    dev_dependency = True,
+    downloaded_file_path = "cirros-0.6.3-x86_64-disk.img",
+    sha256 = "7d6355852aeb6dbcd191bcda7cd74f1536cfe5cbf8a10495a7283a8396e4b75b",
+    urls = ["https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-disk.img"],
+)
+
+http_file(
+    name = "cirros_x86_64_kernel",
+    dev_dependency = True,
+    downloaded_file_path = "cirros-0.6.3-x86_64-kernel",
+    sha256 = "a491ac80495772be3d6d11d7eeb5987e9a7e9150aefa19894a49e1682fec727c",
+    urls = ["https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-kernel"],
+)
+
+http_file(
+    name = "cirros_x86_64_initramfs",
+    dev_dependency = True,
+    downloaded_file_path = "cirros-0.6.3-x86_64-initramfs",
+    sha256 = "e01b0c4bbf969784b8d91c0054bc8794ba8811b0db5b86986c6c6990a3f8a4b9",
+    urls = ["https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-initramfs"],
+)
+
+http_file(
+    name = "cirros_aarch64_disk",
+    dev_dependency = True,
+    downloaded_file_path = "cirros-0.6.3-aarch64-disk.img",
+    sha256 = "611879b8299363fe60ff0f84982e4da08e63f476e8481170223db982959783cb",
+    urls = ["https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-aarch64-disk.img"],
+)
+
+http_file(
+    name = "cirros_aarch64_kernel",
+    dev_dependency = True,
+    downloaded_file_path = "cirros-0.6.3-aarch64-kernel",
+    sha256 = "9e355f88d994d74ea60a64f4e71d23b66613740540fd015ed04ce121669a41fc",
+    urls = ["https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-aarch64-kernel"],
+)
+
+http_file(
+    name = "cirros_aarch64_initramfs",
+    dev_dependency = True,
+    downloaded_file_path = "cirros-0.6.3-aarch64-initramfs",
+    sha256 = "05426f4a5dcab601248828c8605bd78572d7da6a6a68806ff51b9ebb1035694d",
+    urls = ["https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-aarch64-initramfs"],
+)
+
 # A downloaded python-build-standalone runtime keeps both image actions and
 # QEMU tests independent of the Python installation on an execution worker.
 # A consuming root module may override this toolchain in the usual

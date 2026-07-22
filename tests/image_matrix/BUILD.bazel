@@ -1,0 +1,161 @@
+load("@rules_python//python:py_test.bzl", "py_test")
+load(
+    "//ostest:defs.bzl",
+    "fat_image",
+    "gpt_image",
+    "gpt_partition",
+    "mbr_image",
+    "mbr_partition",
+    "raw_image",
+    "uefi_disk_image",
+    "uefi_iso_image",
+)
+
+package(default_visibility = ["//visibility:private"])
+
+fat_image(
+    name = "fat_uncompressed",
+    out = "custom-fat.bin",
+    compression = "none",
+    files = {
+        "fixtures/first.txt": "Long Directory Name/Mixed Case Long Filename.txt",
+        "fixtures/second.txt": "Long Directory Name/Mixed Case Longer Filename.txt",
+    },
+    size_mb = 34,
+    volume_id = 0x1234ABCD,
+    volume_label = "cidata",
+)
+
+raw_image(
+    name = "raw_uncompressed",
+    out = "custom-raw.bin",
+    blobs = {
+        "fixtures/bytes.txt": "17B",
+        "fixtures/kib.txt": "1KiB",
+        "fixtures/mib.txt": "2MiB",
+        "fixtures/sectors.txt": "6144s",
+    },
+    compression = "none",
+    size_mb = 4,
+)
+
+raw_image(
+    name = "partition_one_image",
+    blobs = {"fixtures/partition-one.txt": "0"},
+    compression = "none",
+    size_mb = 1,
+)
+
+raw_image(
+    name = "partition_two_image",
+    blobs = {"fixtures/partition-two.txt": "0"},
+    compression = "none",
+    size_mb = 1,
+)
+
+gpt_partition(
+    name = "gpt_partition_one",
+    alignment_lba = 64,
+    attributes = 5,
+    image = ":partition_one_image",
+    image_compression = "none",
+    partition_name = "Fixed Data",
+    start_lba = 128,
+    type_guid = "0fc63daf-8483-4772-8e79-3d69d8477de4",
+    unique_guid = "b65ca79b-07b7-4410-97d6-2ab79022a9a8",
+)
+
+gpt_partition(
+    name = "gpt_partition_two",
+    alignment_lba = 256,
+    image = ":partition_two_image",
+    type_guid = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
+)
+
+gpt_image(
+    name = "gpt_uncompressed",
+    out = "custom-gpt.bin",
+    compression = "none",
+    disk_guid = "857a8d1c-fdc4-4f9c-8d3b-df8bf5af9948",
+    partitions = [
+        ":gpt_partition_one",
+        ":gpt_partition_two",
+    ],
+    size_mb = 8,
+)
+
+uefi_disk_image(
+    name = "uefi_disk_uncompressed",
+    out = "custom-uefi-disk.bin",
+    compression = "none",
+    disk_guid = "5f4bb398-7e44-4189-bf70-9de57bb2d75d",
+    esp = ":fat_uncompressed",
+    partition_guid = "4b8aa8c8-68f7-4b8a-9c7c-e12aa7fc157a",
+    partition_name = "Custom ESP",
+    size_mb = 40,
+    start_lba = 128,
+)
+
+mbr_partition(
+    name = "mbr_partition_one",
+    alignment_lba = 64,
+    bootable = True,
+    image = ":partition_one_image",
+    image_compression = "none",
+    start_lba = 64,
+    type_id = 0x0C,
+)
+
+mbr_partition(
+    name = "mbr_partition_two",
+    alignment_lba = 128,
+    image = ":partition_two_image",
+    type_id = 0x83,
+)
+
+mbr_image(
+    name = "mbr_uncompressed",
+    out = "custom-mbr.bin",
+    compression = "none",
+    partitions = [
+        ":mbr_partition_one",
+        ":mbr_partition_two",
+    ],
+    size_mb = 8,
+)
+
+uefi_iso_image(
+    name = "iso_uncompressed",
+    out = "custom-uefi.iso",
+    compression = "none",
+    esp = ":fat_uncompressed",
+    volume_label = "MATRIX_BOOT",
+)
+
+py_test(
+    name = "image_matrix_test",
+    size = "small",
+    srcs = ["image_matrix_test.py"],
+    args = [
+        "--fat=$(rlocationpath :fat_uncompressed)",
+        "--gpt=$(rlocationpath :gpt_uncompressed)",
+        "--iso=$(rlocationpath :iso_uncompressed)",
+        "--mbr=$(rlocationpath :mbr_uncompressed)",
+        "--raw=$(rlocationpath :raw_uncompressed)",
+        "--uefi-disk=$(rlocationpath :uefi_disk_uncompressed)",
+    ],
+    data = [
+        ":fat_uncompressed",
+        ":gpt_uncompressed",
+        ":iso_uncompressed",
+        ":mbr_uncompressed",
+        ":raw_uncompressed",
+        ":uefi_disk_uncompressed",
+    ],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = [
+        "//ostest/private:raw_image_tool",
+        "@rules_python//python/runfiles",
+    ],
+)

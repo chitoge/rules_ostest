@@ -63,7 +63,7 @@ jobs:
       - name: Check GitHub Actions workflow
         run: |
           curl --fail --location --silent --show-error \
-            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_x86_64.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
             --output "${RUNNER_TEMP}/actionlint.tar.gz"
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  ${RUNNER_TEMP}/actionlint.tar.gz" \
             | sha256sum --check --strict
@@ -77,7 +77,7 @@ jobs:
         run: bazel build --lockfile_mode=off //:consumer_smoke
 
   real-qemu:
-    name: Real QEMU/OVMF boot
+    name: Real QEMU/UEFI boot
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -92,18 +92,34 @@ jobs:
         with:
           bazelisk-cache: true
           repository-cache: true
-      - name: Install QEMU, OVMF, and EFI Shell
+      - name: Install QEMU, UEFI firmware, and EFI Shell
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends efi-shell-x64 ovmf qemu-system-x86
+          sudo apt-get install --no-install-recommends \
+            efi-shell-aa64 efi-shell-x64 \
+            ovmf qemu-efi-aarch64 \
+            qemu-system-arm qemu-system-x86
       - name: Stage declared QEMU runtime
         run: |
           tests/integration/stage_runtime.sh
           cat tests/integration/runtime/PACKAGES.txt
-      - name: Boot real EFI Shell image
-        run: >-
-          bazel test
-          --lockfile_mode=off
-          --nocache_test_results
-          --test_output=errors
-          //tests/integration:real_qemu_efi_shell_test
+      - name: Exercise real QEMU guests
+        run: |
+          bazel test \
+            --lockfile_mode=off \
+            --local_test_jobs=1 \
+            --nocache_test_results \
+            --test_output=errors \
+            //tests/integration:real_qemu_efi_shell_test \
+            //tests/integration:real_qemu_aarch64_efi_shell_test \
+            //tests/integration:real_qemu_scripted_control_test \
+            //tests/integration:real_cirros_cloud_test \
+            //tests/integration:real_cirros_aarch64_cloud_test \
+            //tests/integration:real_cirros_kvm_test \
+            //tests/integration:real_cirros_shutdown_test \
+            //tests/integration:real_cirros_scripted_media_test \
+            //tests/integration/media_matrix:real_cirros_cdrom_test \
+            //tests/integration/media_matrix:real_efi_shell_media_test \
+            //tests/integration/media_matrix:real_efi_shell_usb_readonly_test \
+            //tests/integration/media_matrix:real_efi_shell_nvme_readonly_test \
+            //tests/integration/lab_matrix:real_cirros_lab_tcg_test

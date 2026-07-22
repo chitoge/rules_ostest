@@ -1,9 +1,13 @@
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load(
     "//ostest:defs.bzl",
+    "fat_image",
+    "qemu_hostfwd",
     "qemu_media",
+    "qemu_scratch_disk",
     "uefi_disk_image",
     "uefi_esp_image",
+    "uefi_py_test",
     "uefi_test",
 )
 
@@ -13,6 +17,15 @@ filegroup(
     name = "efi_shell_x64",
     srcs = glob(
         ["runtime/shellx64.efi*"],
+        allow_empty = True,
+    ),
+    visibility = ["//tests/integration:__subpackages__"],
+)
+
+filegroup(
+    name = "efi_shell_aa64",
+    srcs = glob(
+        ["runtime/shellaa64.efi*"],
         allow_empty = True,
     ),
 )
@@ -45,18 +58,106 @@ uefi_disk_image(
     ],
 )
 
+uefi_esp_image(
+    name = "real_qemu_scripted_esp",
+    arch = "x86_64",
+    efi_binary = ":efi_shell_x64",
+    files = {
+        "efi_shell_scripted_startup.nsh": "EFI/BOOT/startup.nsh",
+    },
+    size_mb = 64,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "SCRIPTED",
+)
+
+fat_image(
+    name = "cirros_seed",
+    files = {
+        "cirros_meta_data.json": "meta-data",
+        "cirros_user_data.sh": "user-data",
+    },
+    size_mb = 34,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "cidata",
+)
+
+fat_image(
+    name = "cirros_shutdown_seed",
+    files = {
+        "cirros_meta_data.json": "meta-data",
+        "cirros_shutdown_user_data.sh": "user-data",
+    },
+    size_mb = 34,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "cidata",
+)
+
+uefi_esp_image(
+    name = "real_qemu_aarch64_shell_esp",
+    arch = "aarch64",
+    efi_binary = ":efi_shell_aa64",
+    files = {
+        "efi_shell_startup.nsh": "EFI/BOOT/startup.nsh",
+        "efi_shell_fixture.txt": "EFI/OSTEST/fixture.txt",
+    },
+    size_mb = 64,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "OSTESTAA64",
+)
+
+uefi_disk_image(
+    name = "real_qemu_aarch64_shell_disk",
+    disk_guid = "ad53e761-3e49-4e19-86cb-1289822b39d3",
+    esp = ":real_qemu_aarch64_shell_esp",
+    partition_guid = "28a70c8e-67df-4c74-82c5-60373df6e3f8",
+    size_mb = 96,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+)
+
 filegroup(
     name = "ovmf_code",
     srcs = glob(
         ["runtime/OVMF_CODE_4M.fd*"],
         allow_empty = True,
     ),
+    visibility = ["//tests/integration:__subpackages__"],
 )
 
 filegroup(
     name = "ovmf_vars",
     srcs = glob(
         ["runtime/OVMF_VARS_4M.fd*"],
+        allow_empty = True,
+    ),
+)
+
+filegroup(
+    name = "aavmf_code",
+    srcs = glob(
+        ["runtime/AAVMF_CODE.fd*"],
+        allow_empty = True,
+    ),
+)
+
+filegroup(
+    name = "aavmf_vars",
+    srcs = glob(
+        ["runtime/AAVMF_VARS.fd*"],
         allow_empty = True,
     ),
 )
@@ -74,6 +175,30 @@ py_binary(
     ),
     legacy_create_init = 0,
     main = "qemu_system_x86_64.py",
+    python_version = "3.12",
+    visibility = ["//tests/integration:__subpackages__"],
+)
+
+py_binary(
+    name = "qemu_system_aarch64",
+    srcs = ["qemu_system_aarch64.py"],
+    data = glob(
+        [
+            "runtime/PACKAGES.txt*",
+            "runtime/licenses/**",
+            "runtime/root/**",
+        ],
+        allow_empty = True,
+    ),
+    legacy_create_init = 0,
+    main = "qemu_system_aarch64.py",
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "cirros_ssh_probe",
+    srcs = ["cirros_ssh_probe.py"],
+    legacy_create_init = 0,
     python_version = "3.12",
 )
 
@@ -100,6 +225,7 @@ uefi_test(
         {
             "markers": [
                 "OSTEST: EFI SHELL",
+                "OSTEST: VARIABLE WRITE COMMAND OK",
                 "OSTEST: PHASE ONE WRITE",
             ],
             "then": "reboot",
@@ -107,6 +233,9 @@ uefi_test(
         {
             "markers": [
                 "OSTEST: PHASE TWO READ",
+                "98B01F10-1F13-4BD2-9173-FAD1C483CC19 - RulesOstestPersistence - 0014 Bytes",
+                "4F 53 54 45 53 54 2D 56 41 52 2D 50 45 52 53 49 53 54 45 44",
+                "OSTEST: VARIABLE READ COMMAND OK",
                 "OSTEST: PASS",
             ],
         },
@@ -119,4 +248,327 @@ uefi_test(
         "no-remote",
     ],
     timeout_seconds = 30,
+)
+
+uefi_test(
+    name = "real_qemu_aarch64_efi_shell_test",
+    size = "small",
+    arch = "aarch64",
+    cpu_model = "cortex-a57",
+    export_firmware_vars = True,
+    firmware = ":aavmf_code",
+    firmware_vars = ":aavmf_vars",
+    forbidden_markers = ["OSTEST: FAIL"],
+    media = [qemu_media(
+        name = "aarch64_shell_state",
+        bootindex = 1,
+        export = True,
+        image = ":real_qemu_aarch64_shell_disk",
+        readonly = False,
+        snapshot = False,
+    )],
+    memory_mb = 256,
+    phases = [
+        {
+            "markers": [
+                "OSTEST: EFI SHELL",
+                "OSTEST: VARIABLE WRITE COMMAND OK",
+                "OSTEST: PHASE ONE WRITE",
+            ],
+            "then": "reboot",
+        },
+        {
+            "markers": [
+                "OSTEST: PHASE TWO READ",
+                "98B01F10-1F13-4BD2-9173-FAD1C483CC19 - RulesOstestPersistence - 0014 Bytes",
+                "4F 53 54 45 53 54 2D 56 41 52 2D 50 45 52 53 49 53 54 45 44",
+                "OSTEST: VARIABLE READ COMMAND OK",
+                "OSTEST: PASS",
+            ],
+        },
+    ],
+    qemu = ":qemu_system_aarch64",
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 60,
+)
+
+uefi_py_test(
+    name = "real_qemu_scripted_control_test",
+    size = "small",
+    srcs = ["real_qemu_scripted_test.py"],
+    arch = "x86_64",
+    disk = ":real_qemu_scripted_esp",
+    firmware = ":ovmf_code",
+    firmware_vars = ":ovmf_vars",
+    gdb = True,
+    graphics = True,
+    main = "real_qemu_scripted_test.py",
+    memory_mb = 128,
+    pause_at_start = True,
+    qemu = ":qemu_system_x86_64",
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+)
+
+uefi_test(
+    name = "real_cirros_cloud_test",
+    size = "medium",
+    arch = "x86_64",
+    boot = "direct-kernel",
+    cpus = 2,
+    debugcon = True,
+    firmware = None,
+    forbidden_markers = ["OSTEST: FAIL"],
+    host_companion = ":cirros_ssh_probe",
+    host_companion_args = ["--debugcon"],
+    hostfwd = [qemu_hostfwd(
+        name = "ssh",
+        guest = 22,
+    )],
+    initrd = "@cirros_x86_64_initramfs//file",
+    kernel = "@cirros_x86_64_kernel//file",
+    kernel_args = "console=ttyS0 root=/dev/vda1 ro",
+    media = [
+        qemu_media(
+            name = "root",
+            bootindex = 1,
+            compression = "none",
+            image = "@cirros_x86_64_disk//file",
+            image_format = "qcow2",
+            readonly = False,
+            snapshot = True,
+        ),
+        qemu_media(
+            name = "seed",
+            bootindex = None,
+            image = ":cirros_seed",
+            readonly = True,
+        ),
+        qemu_scratch_disk(
+            name = "scratch",
+            export = True,
+            size_mb = 8,
+        ),
+    ],
+    memory_mb = 384,
+    qemu = ":qemu_system_x86_64",
+    success_markers = [
+        "OSTEST: CLOUD USERDATA",
+        "OSTEST: CLOUD CPUS 2",
+        "OSTEST: DEBUGCON WRITE",
+        "OSTEST: SCRATCH WRITE",
+        "OSTEST: SCRATCH READBACK",
+        "OSTEST: CLOUD PASS",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 90,
+)
+
+uefi_test(
+    name = "real_cirros_aarch64_cloud_test",
+    size = "medium",
+    arch = "aarch64",
+    boot = "direct-kernel",
+    cpus = 2,
+    firmware = None,
+    forbidden_markers = ["OSTEST: FAIL"],
+    host_companion = ":cirros_ssh_probe",
+    hostfwd = [qemu_hostfwd(
+        name = "ssh",
+        guest = 22,
+    )],
+    initrd = "@cirros_aarch64_initramfs//file",
+    kernel = "@cirros_aarch64_kernel//file",
+    kernel_args = "console=ttyAMA0 root=/dev/vda1 ro",
+    media = [
+        qemu_media(
+            name = "root",
+            bootindex = 1,
+            compression = "none",
+            image = "@cirros_aarch64_disk//file",
+            image_format = "qcow2",
+            readonly = False,
+            snapshot = True,
+        ),
+        qemu_media(
+            name = "seed",
+            bootindex = None,
+            image = ":cirros_seed",
+            readonly = True,
+        ),
+        qemu_scratch_disk(
+            name = "scratch",
+            export = True,
+            size_mb = 8,
+        ),
+    ],
+    memory_mb = 512,
+    qemu = ":qemu_system_aarch64",
+    success_markers = [
+        "OSTEST: CLOUD USERDATA",
+        "OSTEST: CLOUD CPUS 2",
+        "OSTEST: SCRATCH WRITE",
+        "OSTEST: SCRATCH READBACK",
+        "OSTEST: CLOUD PASS",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 120,
+)
+
+uefi_test(
+    name = "real_cirros_kvm_test",
+    size = "medium",
+    arch = "x86_64",
+    boot = "direct-kernel",
+    cpus = 2,
+    firmware = None,
+    forbidden_markers = ["OSTEST: FAIL"],
+    hostfwd = [qemu_hostfwd(
+        name = "ssh",
+        guest = 22,
+    )],
+    initrd = "@cirros_x86_64_initramfs//file",
+    kernel = "@cirros_x86_64_kernel//file",
+    kernel_args = "console=ttyS0 root=/dev/vda1 ro",
+    kvm_unavailable = "skip",
+    media = [
+        qemu_media(
+            name = "root",
+            bootindex = 1,
+            compression = "none",
+            image = "@cirros_x86_64_disk//file",
+            image_format = "qcow2",
+            readonly = False,
+            snapshot = True,
+        ),
+        qemu_media(
+            name = "seed",
+            bootindex = None,
+            image = ":cirros_seed",
+            readonly = True,
+        ),
+        qemu_scratch_disk(
+            name = "scratch",
+            size_mb = 8,
+        ),
+    ],
+    memory_mb = 384,
+    qemu = ":qemu_system_x86_64",
+    require_kvm = True,
+    success_markers = [
+        "Hypervisor detected: KVM",
+        "OSTEST: CLOUD USERDATA",
+        "OSTEST: CLOUD CPUS 2",
+        "OSTEST: SCRATCH WRITE",
+        "OSTEST: SCRATCH READBACK",
+        "OSTEST: CLOUD PASS",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 90,
+)
+
+uefi_py_test(
+    name = "real_cirros_shutdown_test",
+    size = "medium",
+    srcs = ["real_cirros_shutdown_test.py"],
+    arch = "x86_64",
+    boot = "direct-kernel",
+    firmware = None,
+    hostfwd = [qemu_hostfwd(
+        name = "ssh",
+        guest = 22,
+    )],
+    initrd = "@cirros_x86_64_initramfs//file",
+    kernel = "@cirros_x86_64_kernel//file",
+    kernel_args = "console=ttyS0 root=/dev/vda1 ro",
+    main = "real_cirros_shutdown_test.py",
+    media = [
+        qemu_media(
+            name = "root",
+            bootindex = 1,
+            compression = "none",
+            image = "@cirros_x86_64_disk//file",
+            image_format = "qcow2",
+            readonly = False,
+            snapshot = True,
+        ),
+        qemu_media(
+            name = "seed",
+            bootindex = None,
+            image = ":cirros_shutdown_seed",
+            readonly = True,
+        ),
+    ],
+    memory_mb = 256,
+    qemu = ":qemu_system_x86_64",
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+)
+
+uefi_py_test(
+    name = "real_cirros_scripted_media_test",
+    size = "medium",
+    srcs = ["real_cirros_scripted_test.py"],
+    arch = "x86_64",
+    boot = "direct-kernel",
+    cpus = 2,
+    firmware = None,
+    hostfwd = [qemu_hostfwd(
+        name = "ssh",
+        guest = 22,
+    )],
+    initrd = "@cirros_x86_64_initramfs//file",
+    kernel = "@cirros_x86_64_kernel//file",
+    kernel_args = "console=ttyS0 root=/dev/vda1 ro",
+    main = "real_cirros_scripted_test.py",
+    media = [
+        qemu_media(
+            name = "root",
+            bootindex = 1,
+            compression = "none",
+            image = "@cirros_x86_64_disk//file",
+            image_format = "qcow2",
+            readonly = False,
+            snapshot = True,
+        ),
+        qemu_media(
+            name = "seed",
+            bootindex = None,
+            image = ":cirros_seed",
+            readonly = True,
+        ),
+        qemu_scratch_disk(
+            name = "scratch",
+            size_mb = 8,
+        ),
+    ],
+    memory_mb = 384,
+    qemu = ":qemu_system_x86_64",
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
 )

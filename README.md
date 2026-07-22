@@ -201,18 +201,39 @@ uefi_test(
 ```
 
 AArch64 direct boot defaults to `virt,gic-version=2` and `cortex-a53`;
-`machine_options` and `cpu_model` can override them. Existing AArch64 UEFI
-tests retain `virt` and `max`. These are real QEMU command paths—the repository
-tests them with a QEMU-shaped fixture, while consumers supply and pin the real
-`qemu-system-aarch64` and any firmware labels.
+`machine_options` and `cpu_model` can override them. AArch64 UEFI tests retain
+`virt` and `max`. Consumers supply and pin the real `qemu-system-aarch64` and
+firmware labels.
 
 The fast Bazel matrix uses deterministic QEMU-shaped fixtures. CI separately
-stages a declared x86-64 QEMU/OVMF runtime and Ubuntu's prebuilt EFI Shell, then
-performs an uncached boot of a real generated FAT/GPT UEFI image under TCG. The
-guest script reads and writes the FAT filesystem and resets the VM; its second
-boot proves persistence across the QMP-observed reset. The same test validates
-ordered serial phases, framebuffer capture, writable-media export, and OVMF
-variable-store export without requiring an EFI build toolchain.
+stages declared x86-64 and AArch64 QEMU runtimes, distro UEFI firmware, and
+Ubuntu's prebuilt EFI Shell binaries, then performs uncached boots of generated
+FAT/GPT UEFI images. The guest script reads and writes the FAT filesystem and
+resets each VM; its second boot proves persistence across the QMP-observed
+reset. These gates validate both UEFI fallback paths, ordered serial phases,
+writable-media export, and a named nonvolatile UEFI variable whose exact value
+is read after reset before the variable store is exported. A scripted x86-64
+gate also validates the real GDB stub, paused startup, QMP resume and shutdown,
+serial matching, and framebuffer capture.
+
+Pinned CirrOS 0.6.3 test images provide direct-kernel gates for both guest
+architectures without adding a guest build toolchain. They validate kernel and
+initramfs boot, qcow2 snapshot media, a generated lowercase `cidata` NoCloud
+seed, two virtual CPUs, QEMU user networking, a dynamically allocated SSH
+forward, and scratch-disk write, readback, and export. The x86-64 guest also
+writes a sentinel through the real ISA debug console, and its companion asserts
+that the byte reached the retained artifact. A separate gate waits for the
+guest to power down and requires QEMU to exit successfully; another requires
+real KVM when available and records a skip otherwise. Bazel downloads the
+SHA-256-verified test OS inputs only for these manual CI targets; they are not
+included in this repository or its release artifacts. QEMU uses KVM when
+available and otherwise falls back to TCG.
+
+The media tier mounts a generated ISO through a real SCSI CD-ROM, rejects a
+write to it, and reads sentinels from its embedded FAT image. EFI Shell provides
+the corresponding USB mass-storage and NVMe read-only checks and confirms that
+blank USB/NVMe scratch devices enumerate. This split is intentional: CirrOS's
+small published initramfs omits the USB-storage and NVMe kernel modules.
 
 ## Filesystems and images
 

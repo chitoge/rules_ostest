@@ -1,0 +1,275 @@
+load(
+    "//ostest:defs.bzl",
+    "fat_image",
+    "qemu_hostfwd",
+    "qemu_media",
+    "qemu_scratch_disk",
+    "uefi_esp_image",
+    "uefi_iso_image",
+    "uefi_test",
+)
+
+package(default_visibility = ["//visibility:private"])
+
+fat_image(
+    name = "seed",
+    files = {
+        "meta_data.json": "meta-data",
+        "user_data.sh": "user-data",
+    },
+    size_mb = 34,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "cidata",
+)
+
+fat_image(
+    name = "usb_media",
+    compression = "gzip",
+    files = {
+        "usb_sentinel.txt": "USB_SENTINEL.txt",
+    },
+    size_mb = 34,
+    volume_label = "USBMEDIA",
+)
+
+fat_image(
+    name = "nvme_media",
+    compression = "none",
+    files = {
+        "nvme_sentinel.txt": "NVME_SENTINEL.txt",
+    },
+    size_mb = 34,
+    volume_label = "NVMEMEDIA",
+)
+
+fat_image(
+    name = "cd_esp",
+    files = {
+        "cd_sentinel.txt": "OSTEST/CD_SENTINEL.txt",
+    },
+    size_mb = 34,
+    volume_label = "CDESP",
+)
+
+uefi_iso_image(
+    name = "cd_media",
+    compression = "gzip",
+    esp = ":cd_esp",
+    volume_label = "OSTEST_CD",
+)
+
+uefi_esp_image(
+    name = "shell_boot",
+    arch = "x86_64",
+    efi_binary = "//tests/integration:efi_shell_x64",
+    files = {
+        "shell_startup.nsh": "EFI/BOOT/startup.nsh",
+    },
+    size_mb = 64,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "MEDIASHELL",
+)
+
+uefi_esp_image(
+    name = "shell_usb_readonly_boot",
+    arch = "x86_64",
+    efi_binary = "//tests/integration:efi_shell_x64",
+    files = {
+        "shell_usb_readonly.nsh": "EFI/BOOT/startup.nsh",
+    },
+    size_mb = 64,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "USBRO",
+)
+
+uefi_esp_image(
+    name = "shell_nvme_readonly_boot",
+    arch = "x86_64",
+    efi_binary = "//tests/integration:efi_shell_x64",
+    files = {
+        "shell_nvme_readonly.nsh": "EFI/BOOT/startup.nsh",
+    },
+    size_mb = 64,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "NVMERO",
+)
+
+uefi_test(
+    name = "real_cirros_cdrom_test",
+    size = "medium",
+    arch = "x86_64",
+    boot = "direct-kernel",
+    firmware = None,
+    forbidden_markers = ["OSTEST: FAIL"],
+    hostfwd = [qemu_hostfwd(
+        name = "ssh",
+        guest = 22,
+    )],
+    initrd = "@cirros_x86_64_initramfs//file",
+    kernel = "@cirros_x86_64_kernel//file",
+    kernel_args = "console=ttyS0 root=/dev/vda1 ro",
+    media = [
+        qemu_media(
+            name = "root",
+            bootindex = 1,
+            compression = "none",
+            image = "@cirros_x86_64_disk//file",
+            image_format = "qcow2",
+            readonly = False,
+            snapshot = True,
+        ),
+        qemu_media(
+            name = "seed",
+            bootindex = None,
+            image = ":seed",
+            readonly = True,
+        ),
+        qemu_media(
+            name = "cd_media",
+            bootindex = None,
+            image = ":cd_media",
+            interface = "cdrom",
+        ),
+    ],
+    memory_mb = 384,
+    qemu = "//tests/integration:qemu_system_x86_64",
+    success_markers = [
+        "OSTEST: MEDIA USERDATA",
+        "OSTEST: CDROM READONLY",
+        "OSTEST: CDROM SENTINEL",
+        "OSTEST: CDROM PASS",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 90,
+)
+
+uefi_test(
+    name = "real_efi_shell_media_test",
+    size = "small",
+    arch = "x86_64",
+    disk = ":shell_boot",
+    firmware = "//tests/integration:ovmf_code",
+    forbidden_markers = ["OSTEST: FAIL"],
+    media = [
+        qemu_media(
+            name = "usb_media",
+            bootindex = None,
+            image = ":usb_media",
+            interface = "usb-storage",
+            readonly = True,
+        ),
+        qemu_scratch_disk(
+            name = "usb_scratch",
+            interface = "usb-storage",
+            size_mb = 2,
+        ),
+        qemu_media(
+            name = "nvme_media",
+            bootindex = None,
+            compression = "none",
+            image = ":nvme_media",
+            interface = "nvme",
+            readonly = True,
+        ),
+        qemu_scratch_disk(
+            name = "nvme_scratch",
+            interface = "nvme",
+            size_mb = 2,
+        ),
+        qemu_media(
+            name = "cd_media",
+            bootindex = None,
+            image = ":cd_media",
+            interface = "cdrom",
+        ),
+    ],
+    memory_mb = 256,
+    qemu = "//tests/integration:qemu_system_x86_64",
+    success_markers = [
+        "Pci(0x5,0x0)/NVMe",
+        "USB(0x1,0x0)",
+        "OSTEST: MEDIA SHELL",
+        "OSTEST: USB MEDIA SENTINEL",
+        "OSTEST: NVME MEDIA SENTINEL",
+        "OSTEST: MEDIA SHELL PASS",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 45,
+)
+
+uefi_test(
+    name = "real_efi_shell_usb_readonly_test",
+    size = "small",
+    arch = "x86_64",
+    disk = ":shell_usb_readonly_boot",
+    firmware = "//tests/integration:ovmf_code",
+    media = [qemu_media(
+        name = "usb_media",
+        bootindex = None,
+        image = ":usb_media",
+        interface = "usb-storage",
+        readonly = True,
+    )],
+    memory_mb = 128,
+    qemu = "//tests/integration:qemu_system_x86_64",
+    success_markers = [
+        "OSTEST: USB READONLY PROBE",
+        "OSTEST: USB MEDIA SENTINEL",
+        "Unable to redirect file.",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 30,
+)
+
+uefi_test(
+    name = "real_efi_shell_nvme_readonly_test",
+    size = "small",
+    arch = "x86_64",
+    disk = ":shell_nvme_readonly_boot",
+    firmware = "//tests/integration:ovmf_code",
+    media = [qemu_media(
+        name = "nvme_media",
+        bootindex = None,
+        compression = "none",
+        image = ":nvme_media",
+        interface = "nvme",
+        readonly = True,
+    )],
+    memory_mb = 128,
+    qemu = "//tests/integration:qemu_system_x86_64",
+    success_markers = [
+        "OSTEST: NVME READONLY PROBE",
+        "OSTEST: NVME MEDIA SENTINEL",
+        "Unable to redirect file.",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "no-remote",
+    ],
+    timeout_seconds = 30,
+)

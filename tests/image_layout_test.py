@@ -139,6 +139,7 @@ class ImageLayoutTest(unittest.TestCase):
         self.assertEqual(len(data), 64 * 1024 * 1024)
         self.assertEqual(data[510:512], b"\x55\xAA")
         self.assertEqual(data[82:90], b"FAT32   ")
+        self.assertEqual(data[71:82], b"OSTEST     ")
         self.assertEqual(struct.unpack_from("<H", data, 14)[0], 32)
         filesystem = Fat32(data)
         self.assertEqual(

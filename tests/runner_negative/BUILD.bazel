@@ -1,0 +1,115 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load(":defs.bzl", "inner_test", "meta_test")
+
+package(default_visibility = ["//visibility:private"])
+
+exports_files(["dummy.fd"])
+
+py_binary(
+    name = "fake_qemu",
+    srcs = ["fake_qemu.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
+py_binary(
+    name = "fake_companion",
+    srcs = ["fake_companion.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
+inner_test(
+    name = "custom_success_inner_test",
+    mode = "custom-success",
+    success_pattern = "CUSTOM\\s+SUCCESS:[0-9]+",
+)
+
+inner_test(
+    name = "failure_regex_inner_test",
+    failure_pattern = "FATAL\\s+code=[0-9]+",
+    mode = "failure-regex",
+)
+
+inner_test(
+    name = "forbidden_marker_inner_test",
+    forbidden_markers = ["NEVER-ALLOWED"],
+    mode = "forbidden-marker",
+    success_markers = ["GUEST READY"],
+)
+
+inner_test(
+    name = "global_timeout_inner_test",
+    mode = "global-timeout",
+    timeout_seconds = 1,
+)
+
+inner_test(
+    name = "unexpected_exit_inner_test",
+    mode = "unexpected-exit",
+)
+
+inner_test(
+    name = "companion_failure_inner_test",
+    host_companion = ":fake_companion",
+    host_companion_args = [
+        "--mode=failure",
+        "alpha",
+        "two words",
+    ],
+    mode = "companion-failure",
+    success_markers = ["GUEST READY"],
+)
+
+inner_test(
+    name = "companion_timeout_inner_test",
+    host_companion = ":fake_companion",
+    host_companion_args = ["--mode=timeout"],
+    mode = "companion-timeout",
+    success_markers = ["GUEST READY"],
+    timeout_seconds = 2,
+)
+
+meta_test(
+    name = "custom_success_meta_test",
+    case = "custom-success",
+    inner = ":custom_success_inner_test",
+)
+
+meta_test(
+    name = "failure_regex_meta_test",
+    case = "failure-regex",
+    inner = ":failure_regex_inner_test",
+)
+
+meta_test(
+    name = "forbidden_marker_meta_test",
+    case = "forbidden-marker",
+    inner = ":forbidden_marker_inner_test",
+)
+
+meta_test(
+    name = "global_timeout_meta_test",
+    case = "global-timeout",
+    inner = ":global_timeout_inner_test",
+)
+
+meta_test(
+    name = "unexpected_exit_meta_test",
+    case = "unexpected-exit",
+    inner = ":unexpected_exit_inner_test",
+)
+
+meta_test(
+    name = "companion_failure_meta_test",
+    case = "companion-failure",
+    companion = True,
+    inner = ":companion_failure_inner_test",
+)
+
+meta_test(
+    name = "companion_timeout_meta_test",
+    case = "companion-timeout",
+    companion = True,
+    inner = ":companion_timeout_inner_test",
+)

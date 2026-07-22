@@ -1,0 +1,55 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load(
+    "//ostest:defs.bzl",
+    "fat_image",
+)
+load(":lab_test.bzl", "real_cirros_lab")
+
+package(default_visibility = ["//visibility:private"])
+
+fat_image(
+    name = "server_seed",
+    files = {
+        "server_meta_data.json": "meta-data",
+        "server_user_data.sh": "user-data",
+    },
+    size_mb = 34,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "cidata",
+)
+
+fat_image(
+    name = "client_seed",
+    files = {
+        "client_meta_data.json": "meta-data",
+        "client_user_data.sh": "user-data",
+    },
+    size_mb = 34,
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    volume_label = "cidata",
+)
+
+py_binary(
+    name = "qemu_system_x86_64_tcg",
+    srcs = ["qemu_system_x86_64_tcg.py"],
+    data = ["//tests/integration:qemu_system_x86_64"],
+    legacy_create_init = 0,
+    main = "qemu_system_x86_64_tcg.py",
+    python_version = "3.12",
+)
+
+real_cirros_lab(
+    name = "real_cirros_lab_test",
+    qemu = "//tests/integration:qemu_system_x86_64",
+)
+
+real_cirros_lab(
+    name = "real_cirros_lab_tcg_test",
+    qemu = ":qemu_system_x86_64_tcg",
+)

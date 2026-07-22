@@ -19,3 +19,5 @@ Notable user-visible changes are recorded here.
   environment-dependent results.
 - Add writable scratch media, safe runfile copying, post-stop readback, and
   exported disk artifacts.
+- Preserve requested FAT volume-label casing, including lowercase NoCloud
+  `cidata` labels.

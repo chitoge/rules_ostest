@@ -182,6 +182,13 @@ py_binary(
     python_version = "3.12",
 )
 
+py_binary(
+    name = "fake_failure_hook",
+    srcs = ["fake_failure_hook.py"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+)
+
 py_test(
     name = "managed_network_test",
     size = "small",
@@ -420,4 +427,39 @@ uefi_test(
     qemu = ":fake_advanced_qemu",
     qemu_args = ["--fake-advanced=hostfwd-exit"],
     success_exit_codes = [7],
+)
+
+# This target must fail: the outer meta-test executes it directly and proves
+# that the public on_failure path observes the completed serial log. The manual
+# tag keeps the intentionally failing target out of wildcard test suites.
+uefi_test(
+    name = "qemu_runner_failure_hook_inner_test",
+    size = "small",
+    arch = "x86_64",
+    firmware = "testdata/dummy.efi",
+    on_failure = ":fake_failure_hook",
+    qemu = ":fake_qemu",
+    qemu_args = ["--fake-mode=failure-hook"],
+    tags = ["manual"],
+)
+
+py_test(
+    name = "qemu_runner_failure_hook_integration_test",
+    size = "small",
+    srcs = ["qemu_runner_failure_hook_integration_test.py"],
+    args = [
+        "--firmware=$(rlocationpath testdata/dummy.efi)",
+        "--hook=$(rlocationpath :fake_failure_hook)",
+        "--inner=$(rlocationpath :qemu_runner_failure_hook_inner_test)",
+        "--qemu=$(rlocationpath :fake_qemu)",
+    ],
+    data = [
+        "testdata/dummy.efi",
+        ":fake_failure_hook",
+        ":fake_qemu",
+        ":qemu_runner_failure_hook_inner_test",
+    ],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["@rules_python//python/runfiles"],
 )

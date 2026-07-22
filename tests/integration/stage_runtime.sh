@@ -5,9 +5,14 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 runtime_dir="${script_dir}/runtime"
 runtime_root="${runtime_dir}/root"
 
-qemu="$(command -v qemu-system-x86_64 || true)"
-if [[ -z "${qemu}" ]]; then
+qemu_x86_64="$(command -v qemu-system-x86_64 || true)"
+if [[ -z "${qemu_x86_64}" ]]; then
     echo "qemu-system-x86_64 is missing; install qemu-system-x86" >&2
+    exit 1
+fi
+qemu_aarch64="$(command -v qemu-system-aarch64 || true)"
+if [[ -z "${qemu_aarch64}" ]]; then
+    echo "qemu-system-aarch64 is missing; install qemu-system-arm" >&2
     exit 1
 fi
 
@@ -20,9 +25,19 @@ done
 
 ovmf_code=/usr/share/OVMF/OVMF_CODE_4M.fd
 ovmf_vars=/usr/share/OVMF/OVMF_VARS_4M.fd
+aavmf_code=/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
+aavmf_vars=/usr/share/AAVMF/AAVMF_VARS.fd
 qemu_data=/usr/share/qemu
-efi_shell=/usr/share/efi-shell-x64/shellx64.efi
-for required_path in "${ovmf_code}" "${ovmf_vars}" "${qemu_data}" "${efi_shell}"; do
+efi_shell_x64=/usr/share/efi-shell-x64/shellx64.efi
+efi_shell_aa64=/usr/share/efi-shell-aa64/shellaa64.efi
+for required_path in \
+    "${ovmf_code}" \
+    "${ovmf_vars}" \
+    "${aavmf_code}" \
+    "${aavmf_vars}" \
+    "${qemu_data}" \
+    "${efi_shell_x64}" \
+    "${efi_shell_aa64}"; do
     if [[ ! -e "${required_path}" ]]; then
         echo "required runtime input is missing: ${required_path}" >&2
         exit 1
@@ -35,7 +50,10 @@ rm -rf -- \
     "${runtime_dir}/licenses" \
     "${runtime_dir}/OVMF_CODE_4M.fd" \
     "${runtime_dir}/OVMF_VARS_4M.fd" \
+    "${runtime_dir}/AAVMF_CODE.fd" \
+    "${runtime_dir}/AAVMF_VARS.fd" \
     "${runtime_dir}/shellx64.efi" \
+    "${runtime_dir}/shellaa64.efi" \
     "${runtime_dir}/PACKAGES.txt"
 mkdir -p -- "${runtime_root}" "${runtime_dir}/licenses"
 
@@ -61,12 +79,17 @@ copy_elf_closure() {
     )
 }
 
-resolved_qemu="$(readlink -f -- "${qemu}")"
-copy_elf_closure "${resolved_qemu}"
+resolved_qemu_x86_64="$(readlink -f -- "${qemu_x86_64}")"
+resolved_qemu_aarch64="$(readlink -f -- "${qemu_aarch64}")"
+copy_elf_closure "${resolved_qemu_x86_64}"
+copy_elf_closure "${resolved_qemu_aarch64}"
 mkdir -p -- "${runtime_root}/usr/bin"
 cp -L --preserve=mode,timestamps -- \
-    "${resolved_qemu}" \
+    "${resolved_qemu_x86_64}" \
     "${runtime_root}/usr/bin/qemu-system-x86_64"
+cp -L --preserve=mode,timestamps -- \
+    "${resolved_qemu_aarch64}" \
+    "${runtime_root}/usr/bin/qemu-system-aarch64"
 
 module_dir=/usr/lib/x86_64-linux-gnu/qemu
 if [[ -d "${module_dir}" ]]; then
@@ -79,9 +102,21 @@ mkdir -p -- "${runtime_root}/usr/share/qemu"
 cp -aL -- "${qemu_data}/." "${runtime_root}/usr/share/qemu/"
 cp -L --preserve=mode,timestamps -- "${ovmf_code}" "${runtime_dir}/OVMF_CODE_4M.fd"
 cp -L --preserve=mode,timestamps -- "${ovmf_vars}" "${runtime_dir}/OVMF_VARS_4M.fd"
-cp -L --preserve=mode,timestamps -- "${efi_shell}" "${runtime_dir}/shellx64.efi"
+cp -L --preserve=mode,timestamps -- "${aavmf_code}" "${runtime_dir}/AAVMF_CODE.fd"
+cp -L --preserve=mode,timestamps -- "${aavmf_vars}" "${runtime_dir}/AAVMF_VARS.fd"
+cp -L --preserve=mode,timestamps -- "${efi_shell_x64}" "${runtime_dir}/shellx64.efi"
+cp -L --preserve=mode,timestamps -- "${efi_shell_aa64}" "${runtime_dir}/shellaa64.efi"
 
-packages=(qemu-system-x86 qemu-system-common qemu-system-data ovmf efi-shell-x64)
+packages=(
+    qemu-system-x86
+    qemu-system-arm
+    qemu-system-common
+    qemu-system-data
+    ovmf
+    qemu-efi-aarch64
+    efi-shell-x64
+    efi-shell-aa64
+)
 for package_name in "${packages[@]}"; do
     notice="/usr/share/doc/${package_name}/copyright"
     if [[ -f "${notice}" ]]; then
