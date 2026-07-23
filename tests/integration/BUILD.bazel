@@ -13,21 +13,20 @@ load(
 
 package(default_visibility = ["//visibility:private"])
 
-filegroup(
+exports_files([
+    "qemu_noble.lock.json",
+    "qemu_noble.yaml",
+])
+
+alias(
     name = "efi_shell_x64",
-    srcs = glob(
-        ["runtime/shellx64.efi*"],
-        allow_empty = True,
-    ),
+    actual = "@qemu_noble_x86_64//:root/usr/share/efi-shell-x64/shellx64.efi",
     visibility = ["//tests/integration:__subpackages__"],
 )
 
-filegroup(
+alias(
     name = "efi_shell_aa64",
-    srcs = glob(
-        ["runtime/shellaa64.efi*"],
-        allow_empty = True,
-    ),
+    actual = "@qemu_noble_x86_64//:root/usr/share/efi-shell-aa64/shellaa64.efi",
 )
 
 uefi_esp_image(
@@ -129,70 +128,62 @@ uefi_disk_image(
     ],
 )
 
-filegroup(
+alias(
     name = "ovmf_code",
-    srcs = glob(
-        ["runtime/OVMF_CODE_4M.fd*"],
-        allow_empty = True,
-    ),
+    actual = "@qemu_noble_x86_64//:root/usr/share/OVMF/OVMF_CODE_4M.fd",
     visibility = ["//tests/integration:__subpackages__"],
 )
 
-filegroup(
+alias(
     name = "ovmf_vars",
-    srcs = glob(
-        ["runtime/OVMF_VARS_4M.fd*"],
-        allow_empty = True,
-    ),
+    actual = "@qemu_noble_x86_64//:root/usr/share/OVMF/OVMF_VARS_4M.fd",
 )
 
-filegroup(
+alias(
     name = "aavmf_code",
-    srcs = glob(
-        ["runtime/AAVMF_CODE.fd*"],
-        allow_empty = True,
-    ),
+    actual = "@qemu_noble_x86_64//:root/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
 )
 
-filegroup(
+alias(
     name = "aavmf_vars",
-    srcs = glob(
-        ["runtime/AAVMF_VARS.fd*"],
-        allow_empty = True,
-    ),
+    actual = "@qemu_noble_x86_64//:root/usr/share/AAVMF/AAVMF_VARS.fd",
 )
 
 py_binary(
     name = "qemu_system_x86_64",
     srcs = ["qemu_system_x86_64.py"],
-    data = glob(
-        [
-            "runtime/PACKAGES.txt*",
-            "runtime/licenses/**",
-            "runtime/root/**",
-        ],
-        allow_empty = True,
-    ),
+    data = [
+        "@qemu_noble_x86_64//:PACKAGES.txt",
+        "@qemu_noble_x86_64//:licenses",
+        "@qemu_noble_x86_64//:runtime",
+    ],
     legacy_create_init = 0,
     main = "qemu_system_x86_64.py",
     python_version = "3.12",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
     visibility = ["//tests/integration:__subpackages__"],
+    deps = ["@rules_python//python/runfiles"],
 )
 
 py_binary(
     name = "qemu_system_aarch64",
     srcs = ["qemu_system_aarch64.py"],
-    data = glob(
-        [
-            "runtime/PACKAGES.txt*",
-            "runtime/licenses/**",
-            "runtime/root/**",
-        ],
-        allow_empty = True,
-    ),
+    data = [
+        "@qemu_noble_x86_64//:PACKAGES.txt",
+        "@qemu_noble_x86_64//:licenses",
+        "@qemu_noble_x86_64//:runtime",
+    ],
     legacy_create_init = 0,
     main = "qemu_system_aarch64.py",
     python_version = "3.12",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    deps = ["@rules_python//python/runfiles"],
 )
 
 py_binary(

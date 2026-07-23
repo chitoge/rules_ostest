@@ -5,10 +5,10 @@ Bazel. It supports x86-64 and AArch64 guests, UEFI and direct-kernel boot,
 serial and Python/QMP tests, writable-media readback, graphics, managed host
 forwards, persistent variables, and isolated multi-VM networks.
 
-The project keeps emulators and firmware outside the ruleset. Image actions do
-not need QEMU. A real guest test receives QEMU and firmware as explicit Bazel
-labels, allowing a consumer to choose either a local system setup or a
-content-pinned runtime bundle.
+The library rules keep emulators and firmware outside their implementation.
+Image actions do not need QEMU. A real guest test receives QEMU and firmware as
+explicit Bazel labels. This repository's manual integration targets use a
+test-only, content-pinned runtime; consumers remain free to supply their own.
 
 ## Highlights
 
@@ -56,23 +56,26 @@ Python 3.12 toolchain through `rules_python`.
 |---|---|---|
 | Image rules | Not required | Compatible through the registered Python toolchain |
 | Default repository tests | Not required | Deterministic QEMU-shaped fixtures; no VM starts |
-| Test label wrapping `/usr/bin/qemu-system-*` | Required on every worker | Non-hermetic |
-| Test label containing a pinned QEMU runtime | Not required | Remote-compatible when the runtime closure is complete |
+| Repository real integration targets | Not required | Pinned inputs; kept local until a worker's VM capabilities are qualified |
+| Consumer label wrapping `/usr/bin/qemu-system-*` | Required on every worker | Non-hermetic |
+| Consumer label containing a pinned QEMU runtime | Not required | Remote-compatible when the runtime closure and worker capabilities are complete |
 
 A dynamically linked bundle must declare its ELF loader, shared libraries,
 QEMU modules and data, firmware, and notices. A static QEMU bundle is simpler,
 but its firmware and data files remain explicit inputs. The rules never search
 `PATH` or install QEMU.
 
-Project CI installs Ubuntu QEMU as a bootstrap, stages its dynamic closure into
-Bazel runfiles, and boots real x86-64 and AArch64 guests in local sandboxed test
-actions. This proves the staged runfile path and real guest behavior. It does
-not prove execution on an actual remote-execution service; the real integration
-targets are tagged `no-remote`.
+Project CI fetches an exact Ubuntu snapshot closure for QEMU 8.2.2, OVMF,
+AAVMF, and the x86-64/AArch64 EFI Shell. Every one of the 90 package archives
+has a checked SHA-256. Bazel extracts the closure outside the source tree and
+boots real x86-64 and AArch64 guests in local sandboxed test actions. No
+system QEMU installation is used. The integration targets remain `no-remote`
+until a remote worker's emulator, process, socket, and resource policies are
+qualified.
 
 The [setup guide](docs/getting-started.md) includes:
 
-- commands for a local real-QEMU gate and the authoritative full-matrix list;
+- commands for the pinned local real-QEMU gate and lock maintenance;
 - a content-addressed QEMU bundle layout;
 - an `http_archive` overlay and runfile-aware dynamic-loader wrapper;
 - remote-worker requirements for TCG, sockets, file descriptors, and scratch
@@ -123,8 +126,10 @@ uefi_test(
 )
 ```
 
-The QEMU and firmware labels are examples from the hermetic bundle pattern in
-the setup guide; this repository does not define or redistribute them.
+The QEMU and firmware labels are consumer examples from the hermetic bundle
+pattern in the setup guide. The repository defines a development-only runtime
+for its own integration tests, but does not redistribute its binaries or make
+that runtime part of the consumed rules module.
 
 The legacy default protocol accepts `OSTEST: PASS` and rejects `OSTEST: FAIL`.
 Tests can instead use regular expressions, ordered markers, or reboot phases.

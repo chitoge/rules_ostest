@@ -11,10 +11,21 @@ bazel_dep(name = "platforms", version = "1.0.0")
 
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.2", dev_dependency = True)
 
-# Small, pinned test-only guest inputs. These repositories are not created when
-# rules_ostest is consumed as a dependency, and no guest image is redistributed
-# in this source tree or its release artifacts.
+# Pinned test-only emulator, firmware, and guest inputs. These repositories are
+# not created when rules_ostest is consumed as a dependency, and their binaries
+# are not redistributed in this source tree or its release artifacts.
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+qemu_runtime_repository = use_repo_rule(
+    "//tests/integration:qemu_runtime_repository.bzl",
+    "qemu_runtime_repository",
+)
+
+qemu_runtime_repository(
+    name = "qemu_noble_x86_64",
+    dev_dependency = True,
+    lock = "//tests/integration:qemu_noble.lock.json",
+)
 
 http_file(
     name = "cirros_x86_64_disk",

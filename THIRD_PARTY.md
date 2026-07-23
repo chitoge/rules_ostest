@@ -34,17 +34,24 @@ repository or a source release.
 
 ## QEMU, firmware, and EFI Shell
 
-QEMU and UEFI firmware are consumer-supplied Bazel targets. The `rules_ostest`
-source distribution does not contain, link with, or redistribute either one.
-It launches the QEMU executable as a separate process and communicates through
-command-line arguments, byte streams, QMP sockets, and network sockets.
+The public rules accept consumer-supplied QEMU and UEFI firmware Bazel targets.
+The `rules_ostest` source distribution does not contain, link with, or
+redistribute those binaries. It launches QEMU as a separate process and
+communicates through command-line arguments, byte streams, QMP sockets, and
+network sockets.
 
-The real-QEMU CI job temporarily stages the Ubuntu QEMU packages, their dynamic
-runtime closure, OVMF and AAVMF, prebuilt TianoCore EFI Shell binaries for
-x86-64 and AArch64, and their package notices into a Git-ignored test directory.
-Those files are declared test inputs, are not committed or uploaded as release
-artifacts, and are discarded with the hosted runner. No EDK II or guest build
-toolchain is used by these tests.
+For this repository's own manual tests, the root module defines a
+development-only Bazel repository backed by Ubuntu's
+`20260720T000000Z` Noble snapshot. The checked lock records 90 exact package
+URLs and SHA-256 digests covering QEMU 8.2.2, its dynamic runtime closure,
+OVMF, AAVMF, prebuilt TianoCore EFI Shell binaries for x86-64 and AArch64, and
+package copyright notices. Bazel downloads and extracts those packages into
+its external-repository area; they are not copied into the Git tree or
+uploaded as release artifacts. No EDK II or guest build toolchain is used.
+
+`rules_distroless` v0.5.1 is used only by the disposable lock-update helper to
+resolve the Ubuntu package graph. It is not a direct module dependency or a
+runtime input. Normal builds and tests consume the checked JSON lock directly.
 
 The QEMU emulator as a whole is licensed under GNU GPL version 2. QEMU's own
 distribution also contains separately licensed components and firmware. Because
@@ -52,7 +59,7 @@ QEMU remains a separate program here, using it to run tests does not require
 `rules_ostest` itself to be relicensed under the GPL. The project remains
 Apache-2.0.
 
-The staged EFI Shell binaries are built from TianoCore EDK II ShellPkg and are
+The fetched EFI Shell binaries are built from TianoCore EDK II ShellPkg and are
 covered by the licenses recorded in Ubuntu's `efi-shell-x64` and
 `efi-shell-aa64` copyright notices, principally BSD-2-Clause-Patent for
 ShellPkg. Executing them as separate test guests does not change this project's
@@ -82,6 +89,8 @@ repository's Apache-2.0 license covers them.
 Upstream references:
 
 - QEMU license: <https://gitlab.com/qemu-project/qemu/-/blob/master/LICENSE>
+- Ubuntu snapshot service: <https://snapshot.ubuntu.com/>
+- `rules_distroless`: <https://github.com/GoogleContainerTools/rules_distroless>
 - TianoCore EDK II license: <https://github.com/tianocore/edk2/blob/master/License-History.txt>
 - CirrOS 0.6.3 downloads and checksums: <https://download.cirros-cloud.net/0.6.3/>
 - CirrOS 0.6.3 source: <https://github.com/cirros-dev/cirros/tree/0.6.3>

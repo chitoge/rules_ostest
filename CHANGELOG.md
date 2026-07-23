@@ -21,5 +21,7 @@ Notable user-visible changes are recorded here.
   exported disk artifacts.
 - Preserve requested FAT volume-label casing, including lowercase NoCloud
   `cidata` labels.
-- Document Git-only consumption and distinguish local system QEMU, staged
-  runfiles, and content-pinned remote-execution bundles.
+- Add a development-only, SHA-256-locked Ubuntu snapshot closure for real
+  QEMU, OVMF/AAVMF, and EFI Shell integration tests without host installation.
+- Document Git-only consumption and distinguish the repository's pinned test
+  runtime from consumer-owned remote-execution bundles.

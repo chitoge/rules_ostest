@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the staged QEMU wrapper with its KVM preference removed."""
+"""Run the pinned QEMU wrapper with its KVM preference removed."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _qemu_wrapper() -> pathlib.Path:
                 logical, separator, physical = line.rstrip("\n").partition(" ")
                 if logical == key and separator:
                     return pathlib.Path(physical)
-    raise RuntimeError("staged x86_64 QEMU wrapper is absent from runfiles")
+    raise RuntimeError("pinned x86_64 QEMU wrapper is absent from runfiles")
 
 
 def main() -> None:

@@ -59,7 +59,10 @@ jobs:
       - name: Validate module lock
         run: bazel mod deps --lockfile_mode=error >/dev/null
       - name: Check Bazel formatting
-        run: bazel run --lockfile_mode=error @buildifier_prebuilt//:buildifier -- -mode=check -lint=warn -r .
+        run: |
+          bazel run --lockfile_mode=error \
+            @buildifier_prebuilt//:buildifier -- \
+            -mode=check -lint=warn -r "${GITHUB_WORKSPACE}"
       - name: Check GitHub Actions workflow
         run: |
           curl --fail --location --silent --show-error \
@@ -92,17 +95,11 @@ jobs:
         with:
           bazelisk-cache: true
           repository-cache: true
-      - name: Install QEMU, UEFI firmware, and EFI Shell
+      - name: Fetch content-pinned QEMU runtime
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends \
-            efi-shell-aa64 efi-shell-x64 \
-            ovmf qemu-efi-aarch64 \
-            qemu-system-arm qemu-system-x86
-      - name: Stage declared QEMU runtime
-        run: |
-          tests/integration/stage_runtime.sh
-          cat tests/integration/runtime/PACKAGES.txt
+          bazel fetch \
+            --lockfile_mode=off \
+            @qemu_noble_x86_64//:runtime
       - name: Exercise real QEMU guests
         run: |
           bazel test \

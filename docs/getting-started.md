@@ -62,23 +62,19 @@ install packages, or download an emulator automatically.
 |---|---|---|
 | Image rules | No | Remote-compatible with the registered Python toolchain |
 | Repository default tests | No | Deterministic fixture tests; no VM is started |
+| Repository manual real tests | No | Content-pinned; `no-remote` pending worker qualification |
 | Wrapper around `/usr/bin/qemu-system-*` | Yes, on every worker | Non-hermetic and unsuitable for general remote execution |
 | Declared static QEMU bundle | No | Simplest hermetic remote input |
 | Declared dynamic QEMU closure | No | Hermetic when the loader, libraries, modules, data files, and firmware are complete |
 
 ## Run this repository's real integration tests locally
 
-The real integration matrix intentionally uses Ubuntu packages as a bootstrap.
-On Ubuntu 24.04:
+No local QEMU, firmware, EFI toolchain, or `apt` installation is needed. Bazel
+fetches the same pinned runtime used by CI:
 
 ```sh
-sudo apt-get update
-sudo apt-get install --no-install-recommends \
-  efi-shell-aa64 efi-shell-x64 \
-  ovmf qemu-efi-aarch64 \
-  qemu-system-arm qemu-system-x86
+bazel fetch @qemu_noble_x86_64//:runtime
 
-tests/integration/stage_runtime.sh
 bazel test \
   --local_test_jobs=1 \
   --nocache_test_results \
@@ -86,26 +82,60 @@ bazel test \
   //tests/integration:real_qemu_efi_shell_test
 ```
 
-That command runs one representative x86-64 EFI Shell gate. The real targets
-are tagged `manual`, so wildcard target patterns intentionally exclude them.
-The `real-qemu` job in [the CI workflow](../.github/workflows/ci.yml) contains
-the authoritative explicit label list for the complete matrix.
+The first command materializes 90 packages from Ubuntu's official
+`20260720T000000Z` Noble snapshot. The package graph, version, URL, and SHA-256
+of every archive are checked into
+`tests/integration/qemu_noble.lock.json`. The repository rule extracts the
+archives under Bazel's external-repository directory; it does not write
+binaries into the source checkout. Subsequent workspaces can reuse Bazel's
+repository cache.
 
-`stage_runtime.sh` copies the QEMU executables, ELF loader, dynamic libraries,
-QEMU modules and data, firmware, EFI Shell, and package notices into the
-Git-ignored `tests/integration/runtime` directory. Bazel targets declare that
-staged closure as runfiles and invoke its loader explicitly. The test action
-does not invoke QEMU through `PATH`.
+The launcher resolves QEMU through Bazel runfiles, invokes the pinned closure's
+own ELF loader, supplies only its declared library and QEMU-data paths, and
+never searches `PATH`. Firmware and the EFI Shell are labels from the same
+repository. This makes the inputs content-pinned; the Linux kernel ABI and the
+sandbox's process/socket/resource policy remain execution-platform
+requirements.
 
-This setup is useful for project CI and local verification, but package
-installation is not a reproducible provisioning mechanism: the selected
-Ubuntu package version can change. The integration targets therefore carry a
-`no-remote` tag. Use a content-pinned bundle for a real remote executor.
+The example runs one representative x86-64 EFI Shell gate. Real targets are
+tagged `manual`, so `bazel test //...` intentionally excludes them. The
+`Exercise real QEMU guests` step in
+[the CI workflow](../.github/workflows/ci.yml) is the authoritative 13-target
+matrix. It covers x86-64 and AArch64 EFI Shell, CirrOS direct boot, QMP/GDB
+control, shutdown, writable media, CD-ROM, USB, NVMe, the KVM policy, and a
+forced-TCG multi-VM lab.
 
-## Package QEMU for hermetic remote execution
+On a local 2026-07-23 validation, a cold package fetch took about 54 seconds
+and the uncached 13-target guest phase took 187 seconds; individual guests took
+6–34 seconds. These are orientation numbers, not performance guarantees. In CI,
+inspect the separate `Fetch content-pinned QEMU runtime` and
+`Exercise real QEMU guests` steps and the 13 per-target results. A fast
+default/metadata job is not evidence that real guests ran.
 
-The following pattern keeps the QEMU runtime outside `rules_ostest` while
-making every byte needed by the test a declared, content-pinned input.
+### Update the pinned runtime
+
+Edit `tests/integration/qemu_noble.yaml` to change the snapshot or requested
+packages, then run:
+
+```sh
+tools/update_qemu_runtime_lock.sh
+bazel test //tests:qemu_runtime_lock_test
+```
+
+The updater needs Git, curl, and Bazelisk's `bazel` command. It creates a
+temporary checkout of the dependency resolver at an exact commit and invokes
+its known-good Bazel version; neither becomes a project dependency or changes
+the project's Bazel 8.7+ support floor. Review every changed package, version,
+snapshot URL, and digest in the generated lock. Then run the complete real
+matrix before committing. Do not hand-edit the JSON lock.
+
+## Supply QEMU from a consuming repository
+
+The root module's development-only QEMU repository is not instantiated when
+`rules_ostest` is consumed as a dependency. A consumer should own its emulator
+version and execution-platform contract. The following pattern keeps that
+runtime outside `rules_ostest` while making every byte needed by the test a
+declared, content-pinned input.
 
 ### 1. Produce a runtime bundle
 
@@ -315,20 +345,21 @@ The project currently verifies three distinct layers:
    QEMU-shaped fixture suite without a QEMU installation. During the
    2026-07-23 documentation audit, Bazel execution metadata confirmed that the
    configured remote executor ran this suite's eligible actions.
-2. Ubuntu 24.04 CI stages a dynamic QEMU closure and firmware into declared
-   runfiles, then boots real x86-64 and AArch64 EFI Shell and CirrOS guests in
-   local Bazel test actions.
+2. Ubuntu 24.04 CI fetches the checked Ubuntu-snapshot lock, verifies every
+   archive digest, exposes the dynamic QEMU/firmware closure as declared
+   runfiles, and boots all 13 real x86-64 and AArch64 EFI Shell and CirrOS
+   targets in local Bazel test actions. It does not install host QEMU.
 3. An external-consumer smoke workspace uses `local_path_override` and builds
    image targets on both supported Bazel versions.
 
 The project does **not** currently run real QEMU on a remote-execution backend
-in CI. During the same audit, the staged x86-64 EFI Shell target was dispatched
+in CI. During the same audit, the pinned x86-64 EFI Shell target was dispatched
 to a managed remote executor under its default container isolation and its
 alternate microVM isolation. In both cases the declared inputs transferred,
 but the worker terminated QEMU before it produced serial, stderr, or firmware
 debug output. The target remains `no-remote`.
 
-Therefore, deterministic remote actions and the staged real-QEMU closure are
+Therefore, deterministic remote actions and the pinned real-QEMU closure are
 both tested, but their combination is not a project guarantee. Consumers
 should add one representative TCG boot to their own remote-executor CI and
 remove `no-remote` only after that gate passes under the selected worker pool

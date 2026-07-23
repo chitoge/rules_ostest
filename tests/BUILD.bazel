@@ -216,6 +216,19 @@ py_test(
     deps = ["//ostest/python:qemu_testlib"],
 )
 
+py_test(
+    name = "qemu_runtime_lock_test",
+    size = "small",
+    srcs = ["qemu_runtime_lock_test.py"],
+    args = [
+        "--lock=$(rlocationpath //tests/integration:qemu_noble.lock.json)",
+    ],
+    data = ["//tests/integration:qemu_noble.lock.json"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["@rules_python//python/runfiles"],
+)
+
 py_binary(
     name = "fake_qmp_qemu",
     srcs = ["fake_qmp_qemu.py"],

@@ -25,18 +25,26 @@ Continuous integration exercises the supported Bazel 8 and 9 releases, plus
 uncached real-QEMU integration tests for x86-64 and AArch64. The real matrix
 covers EFI Shell, direct-kernel CirrOS guests, and scripted QMP/GDB control.
 The default local suite uses fake QEMU executables and does not require KVM,
-QEMU, UEFI firmware, or guest images. The manual integration targets stage
-their system runtime and prebuilt EFI Shell and fetch pinned test-only CirrOS
-inputs through Bazel; no EFI or guest build toolchain is required.
+QEMU, UEFI firmware, or guest images. The manual integration targets fetch a
+SHA-256-locked Ubuntu snapshot closure containing QEMU, firmware, and prebuilt
+EFI Shell binaries, plus pinned test-only CirrOS inputs. No system QEMU, EFI
+build toolchain, or guest build toolchain is required.
 
-The real integration job installs Ubuntu QEMU packages before staging their
-runtime closure. It validates local sandbox/runfile execution, not an actual
-remote-execution service. See
+The real integration job validates local sandbox/runfile execution, not an
+actual remote-execution service. See
 [Getting started and execution environments](docs/getting-started.md) before
 changing QEMU provisioning or remote-execution claims.
 
 Do not commit Bazel output symlinks, Python bytecode, generated disk images,
-guest operating-system images, or real firmware images.
+guest operating-system images, QEMU executables, or real firmware images. The
+QEMU YAML manifest and JSON lock are provenance metadata, not binaries.
+
+To change the integration runtime, edit
+`tests/integration/qemu_noble.yaml`, run
+`tools/update_qemu_runtime_lock.sh`, review every package/version/URL/hash
+change, and run the lock test plus the complete real-QEMU matrix documented in
+the setup guide. The updater uses a disposable, pinned dependency resolver; it
+does not add that resolver or Bazel 7 support to the project module.
 
 ## Consumption and release model
 

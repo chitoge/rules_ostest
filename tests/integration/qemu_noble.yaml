@@ -1,0 +1,27 @@
+# Input manifest for tools/update_qemu_runtime_lock.sh.
+version: 1
+
+sources:
+  - channel: noble main
+    url: https://snapshot.ubuntu.com/ubuntu/20260720T000000Z
+  - channel: noble universe
+    url: https://snapshot.ubuntu.com/ubuntu/20260720T000000Z
+  - channel: noble-updates main
+    url: https://snapshot.ubuntu.com/ubuntu/20260720T000000Z
+  - channel: noble-updates universe
+    url: https://snapshot.ubuntu.com/ubuntu/20260720T000000Z
+  - channel: noble-security main
+    url: https://snapshot.ubuntu.com/ubuntu/20260720T000000Z
+  - channel: noble-security universe
+    url: https://snapshot.ubuntu.com/ubuntu/20260720T000000Z
+
+archs:
+  - amd64
+
+packages:
+  - efi-shell-aa64
+  - efi-shell-x64
+  - ovmf
+  - qemu-efi-aarch64
+  - qemu-system-arm
+  - qemu-system-x86
