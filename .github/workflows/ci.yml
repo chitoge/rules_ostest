@@ -102,6 +102,7 @@ jobs:
             @qemu_noble_x86_64//:runtime
       - name: Exercise real QEMU guests
         run: |
+          set +e
           bazel test \
             --lockfile_mode=off \
             --local_test_jobs=1 \
@@ -119,4 +120,28 @@ jobs:
             //tests/integration/media_matrix:real_efi_shell_media_test \
             //tests/integration/media_matrix:real_efi_shell_usb_readonly_test \
             //tests/integration/media_matrix:real_efi_shell_nvme_readonly_test \
-            //tests/integration/lab_matrix:real_cirros_lab_tcg_test
+            //tests/integration/lab_matrix:real_cirros_lab_tcg_test \
+            2>&1 | tee "${RUNNER_TEMP}/real-qemu.log"
+          bazel_status=${PIPESTATUS[0]}
+          set -e
+          if (( bazel_status != 0 )); then
+            failure_summary=$(
+              tail -n 120 "${RUNNER_TEMP}/real-qemu.log" |
+                awk '
+                  BEGIN { remaining = 30000 }
+                  {
+                    gsub(/%/, "%25")
+                    gsub(/\r/, "%0D")
+                    line = $0 "%0A"
+                    if (length(line) > remaining) {
+                      printf "%s", substr(line, 1, remaining)
+                      exit
+                    }
+                    printf "%s", line
+                    remaining -= length(line)
+                  }
+                '
+            )
+            echo "::error title=Real QEMU test output::${failure_summary}"
+          fi
+          exit "${bazel_status}"
