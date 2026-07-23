@@ -26,9 +26,10 @@ uncached real-QEMU integration tests for x86-64 and AArch64. The real matrix
 covers EFI Shell, direct-kernel CirrOS guests, and scripted QMP/GDB control.
 The default local suite uses fake QEMU executables and does not require KVM,
 QEMU, UEFI firmware, or guest images. The manual integration targets fetch a
-SHA-256-locked Ubuntu snapshot closure containing QEMU, firmware, and prebuilt
-EFI Shell binaries, plus pinned test-only CirrOS inputs. No system QEMU, EFI
-build toolchain, or guest build toolchain is required.
+SHA-256-locked Ubuntu snapshot closure containing QEMU, SeaBIOS and iPXE
+firmware data, OVMF/AAVMF, and prebuilt EFI Shell binaries, plus pinned
+test-only CirrOS inputs. No system QEMU, EFI build toolchain, or guest build
+toolchain is required.
 
 The real integration job validates local sandbox/runfile execution, not an
 actual remote-execution service. See

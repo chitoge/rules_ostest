@@ -19,8 +19,11 @@ filegroup(
         "root/lib/x86_64-linux-gnu/**",
         "root/usr/bin/qemu-system-aarch64",
         "root/usr/bin/qemu-system-x86_64",
+        "root/usr/lib/ipxe/qemu/**",
         "root/usr/lib/x86_64-linux-gnu/**",
+        "root/usr/share/qemu-efi-aarch64/**",
         "root/usr/share/qemu/**",
+        "root/usr/share/seabios/**",
     ]),
 )
 
@@ -31,6 +34,41 @@ filegroup(
 """
 
 _SNAPSHOT_PREFIX = "https://snapshot.ubuntu.com/ubuntu/20260720T000000Z/"
+_FIRMWARE_DATA = {
+    "root/usr/lib/ipxe/qemu": [
+        "efi-e1000.rom",
+        "efi-e1000e.rom",
+        "efi-eepro100.rom",
+        "efi-ne2k_pci.rom",
+        "efi-pcnet.rom",
+        "efi-rtl8139.rom",
+        "efi-virtio.rom",
+        "efi-vmxnet3.rom",
+        "pxe-e1000.rom",
+        "pxe-e1000e.rom",
+        "pxe-eepro100.rom",
+        "pxe-ne2k_pci.rom",
+        "pxe-pcnet.rom",
+        "pxe-rtl8139.rom",
+        "pxe-virtio.rom",
+        "pxe-vmxnet3.rom",
+    ],
+    "root/usr/share/seabios": [
+        "acpi-dsdt.aml",
+        "bios-256k.bin",
+        "bios-microvm.bin",
+        "bios.bin",
+        "vgabios-ati.bin",
+        "vgabios-bochs-display.bin",
+        "vgabios-cirrus.bin",
+        "vgabios-isavga.bin",
+        "vgabios-qxl.bin",
+        "vgabios-ramfb.bin",
+        "vgabios-stdvga.bin",
+        "vgabios-virtio.bin",
+        "vgabios-vmware.bin",
+    ],
+}
 _REQUIRED_FILES = [
     "root/usr/bin/qemu-system-aarch64",
     "root/usr/bin/qemu-system-x86_64",
@@ -41,6 +79,9 @@ _REQUIRED_FILES = [
     "root/usr/share/OVMF/OVMF_VARS_4M.fd",
     "root/usr/share/efi-shell-aa64/shellaa64.efi",
     "root/usr/share/efi-shell-x64/shellx64.efi",
+    "root/usr/share/qemu/bios-256k.bin",
+    "root/usr/share/qemu/efi-virtio.rom",
+    "root/usr/share/qemu/pxe-virtio.rom",
 ]
 
 def _validate_package(package):
@@ -71,6 +112,19 @@ def _find_data_archive(repository_ctx, package_dir, package_name):
             (package_name, len(archives)),
         )
     return archives[0]
+
+def _link_firmware_data(repository_ctx):
+    """Recreates the distro QEMU firmware lookup view without host paths."""
+
+    for source_dir, filenames in _FIRMWARE_DATA.items():
+        for filename in filenames:
+            source = "%s/%s" % (source_dir, filename)
+            destination = "root/usr/share/qemu/%s" % filename
+            if repository_ctx.path(destination).exists:
+                continue
+            if not repository_ctx.path(source).exists:
+                fail("QEMU runtime is missing firmware data file %s" % source)
+            repository_ctx.symlink(repository_ctx.path(source), destination)
 
 def _qemu_runtime_repository_impl(repository_ctx):
     lock = json.decode(repository_ctx.read(repository_ctx.attr.lock))
@@ -119,6 +173,7 @@ def _qemu_runtime_repository_impl(repository_ctx):
         )
 
     repository_ctx.delete("_packages")
+    _link_firmware_data(repository_ctx)
     for required_file in _REQUIRED_FILES:
         if not repository_ctx.path(required_file).exists:
             fail("QEMU runtime is missing required file %s" % required_file)

@@ -22,6 +22,7 @@ Notable user-visible changes are recorded here.
 - Preserve requested FAT volume-label casing, including lowercase NoCloud
   `cidata` labels.
 - Add a development-only, SHA-256-locked Ubuntu snapshot closure for real
-  QEMU, OVMF/AAVMF, and EFI Shell integration tests without host installation.
+  QEMU, SeaBIOS/iPXE firmware data, OVMF/AAVMF, and EFI Shell integration tests
+  without host installation.
 - Document Git-only consumption and distinguish the repository's pinned test
   runtime from consumer-owned remote-execution bundles.

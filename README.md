@@ -65,13 +65,13 @@ QEMU modules and data, firmware, and notices. A static QEMU bundle is simpler,
 but its firmware and data files remain explicit inputs. The rules never search
 `PATH` or install QEMU.
 
-Project CI fetches an exact Ubuntu snapshot closure for QEMU 8.2.2, OVMF,
-AAVMF, and the x86-64/AArch64 EFI Shell. Every one of the 90 package archives
-has a checked SHA-256. Bazel extracts the closure outside the source tree and
-boots real x86-64 and AArch64 guests in local sandboxed test actions. No
-system QEMU installation is used. The integration targets remain `no-remote`
-until a remote worker's emulator, process, socket, and resource policies are
-qualified.
+Project CI fetches an exact Ubuntu snapshot closure for QEMU 8.2.2, SeaBIOS,
+iPXE option ROMs, OVMF, AAVMF, and the x86-64/AArch64 EFI Shell. Every one of
+the 90 package archives has a checked SHA-256. Bazel extracts the closure
+outside the source tree and boots real x86-64 and AArch64 guests in local
+sandboxed test actions. No system QEMU installation is used. The integration
+targets remain `no-remote` until a remote worker's emulator, process, socket,
+and resource policies are qualified.
 
 The [setup guide](docs/getting-started.md) includes:
 

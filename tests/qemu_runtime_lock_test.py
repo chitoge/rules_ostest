@@ -16,6 +16,7 @@ from python.runfiles import runfiles
 _REQUIRED_PACKAGES = {
     "efi-shell-aa64",
     "efi-shell-x64",
+    "ipxe-qemu",
     "libc6",
     "ovmf",
     "qemu-efi-aarch64",
@@ -23,6 +24,7 @@ _REQUIRED_PACKAGES = {
     "qemu-system-common",
     "qemu-system-data",
     "qemu-system-x86",
+    "seabios",
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _SNAPSHOT_PREFIX = "https://snapshot.ubuntu.com/ubuntu/20260720T000000Z/"

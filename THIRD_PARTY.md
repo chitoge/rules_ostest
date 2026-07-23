@@ -44,10 +44,11 @@ For this repository's own manual tests, the root module defines a
 development-only Bazel repository backed by Ubuntu's
 `20260720T000000Z` Noble snapshot. The checked lock records 90 exact package
 URLs and SHA-256 digests covering QEMU 8.2.2, its dynamic runtime closure,
-OVMF, AAVMF, prebuilt TianoCore EFI Shell binaries for x86-64 and AArch64, and
-package copyright notices. Bazel downloads and extracts those packages into
-its external-repository area; they are not copied into the Git tree or
-uploaded as release artifacts. No EDK II or guest build toolchain is used.
+SeaBIOS, iPXE option ROMs, OVMF, AAVMF, prebuilt TianoCore EFI Shell binaries
+for x86-64 and AArch64, and package copyright notices. Bazel downloads and
+extracts those packages into its external-repository area; they are not copied
+into the Git tree or uploaded as release artifacts. No EDK II or guest build
+toolchain is used.
 
 `rules_distroless` v0.5.1 is used only by the disposable lock-update helper to
 resolve the Ubuntu package graph. It is not a direct module dependency or a
