@@ -7,7 +7,9 @@ import argparse
 import json
 import os
 import pathlib
+import signal
 import stat
+import subprocess
 import sys
 import tempfile
 import types
@@ -47,6 +49,7 @@ from ostest.python.qemu import (
     ResolvedHostForward,
     UefiQemuConfig,
     add_uefi_qemu_arguments,
+    process_status_after_disconnect,
 )
 
 
@@ -327,6 +330,22 @@ class QemuConfigFeatureTest(unittest.TestCase):
         self.assertEqual(destination.read_bytes(), b"durable bytes")
         with self.assertRaises(KeyError):
             session.media_path("missing")
+
+    def test_disconnect_status_waits_for_exit_and_names_signals(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.return_value = -signal.SIGSYS
+        self.assertEqual(
+            process_status_after_disconnect(process),
+            f"{-signal.SIGSYS} (SIGSYS)",
+        )
+        process.wait.assert_called_once_with(timeout=0.5)
+
+    def test_disconnect_status_reports_a_still_running_process(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.side_effect = subprocess.TimeoutExpired("qemu", 0.5)
+        self.assertEqual(process_status_after_disconnect(process), "still running")
 
     def test_media_export_rejects_snapshot(self):
         medium = QemuMedia(

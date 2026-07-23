@@ -46,6 +46,30 @@ class _QmpConnectionClosed(RuntimeError):
     """The QMP peer disconnected before sending a complete response."""
 
 
+def process_status_after_disconnect(
+    process: subprocess.Popen[Any],
+    *,
+    timeout: float = 0.5,
+) -> str:
+    """Returns a useful child status after allowing an exit race to settle."""
+
+    status = process.poll()
+    if status is None:
+        try:
+            status = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            status = process.poll()
+    if status is None:
+        return "still running"
+    if status < 0:
+        try:
+            signal_name = signal.Signals(-status).name
+        except ValueError:
+            signal_name = f"signal {-status}"
+        return f"{status} ({signal_name})"
+    return str(status)
+
+
 def _locate(locator: runfiles.Runfiles, value: str) -> pathlib.Path:
     if os.path.isabs(value):
         raise ValueError(f"expected a runfiles-relative path, got {value!r}")
@@ -820,12 +844,20 @@ class QemuSession:
         try:
             line = self._qmp_file.readline()
         except ConnectionError as error:
-            status = self.process.poll() if self.process is not None else None
+            status = (
+                process_status_after_disconnect(self.process)
+                if self.process is not None
+                else "unavailable"
+            )
             raise _QmpConnectionClosed(
                 f"QMP connection failed; QEMU status is {status}"
             ) from error
         if not line:
-            status = self.process.poll() if self.process is not None else None
+            status = (
+                process_status_after_disconnect(self.process)
+                if self.process is not None
+                else "unavailable"
+            )
             raise _QmpConnectionClosed(
                 f"QMP connection closed; QEMU status is {status}"
             )

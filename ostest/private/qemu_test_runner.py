@@ -40,7 +40,7 @@ from ostest.private.qemu_runner_support import (
     validate_ppm_distinct_pixels,
     write_skipped_junit_xml,
 )
-from ostest.python.qemu import UefiQemuConfig
+from ostest.python.qemu import UefiQemuConfig, process_status_after_disconnect
 
 
 MAX_MATCH_BUFFER = 4 * 1024 * 1024
@@ -188,16 +188,31 @@ def _connect_qmp(
                 time.sleep(0.01)
         connection.settimeout(max(0.001, deadline - time.monotonic()))
         file = connection.makefile("rwb", buffering=0)
-        line = file.readline()
+        try:
+            line = file.readline()
+        except ConnectionError as error:
+            status = process_status_after_disconnect(process)
+            raise RuntimeError(
+                f"QMP greeting failed; QEMU status is {status}"
+            ) from error
         if not line:
-            raise RuntimeError("QMP closed before its greeting")
+            status = process_status_after_disconnect(process)
+            raise RuntimeError(
+                f"QMP closed before its greeting; QEMU status is {status}"
+            )
         greeting = json.loads(line)
         if not isinstance(greeting, dict) or "QMP" not in greeting:
             raise RuntimeError(f"invalid QMP greeting: {greeting!r}")
         pending_events: list[dict[str, Any]] = []
         request_id = 1
         _qmp_write(connection, request_id, "qmp_capabilities")
-        _qmp_wait_response(connection, file, request_id, deadline, pending_events)
+        try:
+            _qmp_wait_response(connection, file, request_id, deadline, pending_events)
+        except ConnectionError as error:
+            status = process_status_after_disconnect(process)
+            raise RuntimeError(
+                f"QMP capability negotiation failed; QEMU status is {status}"
+            ) from error
         connection.settimeout(None)
         return connection, file, pending_events, request_id
     except BaseException:
