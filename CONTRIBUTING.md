@@ -29,8 +29,21 @@ QEMU, UEFI firmware, or guest images. The manual integration targets stage
 their system runtime and prebuilt EFI Shell and fetch pinned test-only CirrOS
 inputs through Bazel; no EFI or guest build toolchain is required.
 
+The real integration job installs Ubuntu QEMU packages before staging their
+runtime closure. It validates local sandbox/runfile execution, not an actual
+remote-execution service. See
+[Getting started and execution environments](docs/getting-started.md) before
+changing QEMU provisioning or remote-execution claims.
+
 Do not commit Bazel output symlinks, Python bytecode, generated disk images,
 guest operating-system images, or real firmware images.
+
+## Consumption and release model
+
+Consumers use a pinned Git checkout through `local_path_override` or
+`git_override`. This project is not published to the Bazel Central Registry,
+and contributions should not add BCR publication metadata or describe an
+unpublished registry release as an installation option.
 
 ## Licensing contributions
 

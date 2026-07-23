@@ -1,5 +1,7 @@
 module(
     name = "rules_ostest",
+    # This version identifies compatibility for Git/local overrides. The
+    # project is not published to the Bazel Central Registry.
     version = "0.1.0",
     bazel_compatibility = [">=8.7.0"],
 )

@@ -2,6 +2,10 @@
 
 `rules_ostest` provides three test entry points:
 
+For Git setup, local QEMU requirements, and content-pinned remote-worker
+packaging, start with
+[Getting started and execution environments](getting-started.md).
+
 - `uefi_test` reads pass and failure patterns from the first serial port.
 - `uefi_py_test` runs a Python test with serial and QMP access to one VM.
 - `uefi_lab_test` runs a Python test that owns several networked VMs.

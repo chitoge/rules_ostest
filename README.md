@@ -2,59 +2,84 @@
 
 `rules_ostest` builds deterministic UEFI media and runs OS tests with QEMU and
 Bazel. It supports x86-64 and AArch64 guests, UEFI and direct-kernel boot,
-ordered and reboot-spanning serial verdicts, Python/QMP test scripts,
-graphical checks, writable-disk readback, managed host forwards, persistent
-UEFI variables, and isolated multi-VM networks.
+serial and Python/QMP tests, writable-media readback, graphics, managed host
+forwards, persistent variables, and isolated multi-VM networks.
 
-The rules are suitable for sandboxed and remote execution:
+The project keeps emulators and firmware outside the ruleset. Image actions do
+not need QEMU. A real guest test receives QEMU and firmware as explicit Bazel
+labels, allowing a consumer to choose either a local system setup or a
+content-pinned runtime bundle.
 
-- QEMU, firmware, media, and variable-store templates are declared Bazel
-  inputs.
-- Image actions use the Python toolchain registered through `rules_python`.
-- FAT32, GPT, primary MBR, fixed-layout, and UEFI El Torito ISO images are
-  reproducible.
-- Image outputs use deterministic gzip compression by default for compact
-  remote-cache storage and transfer.
-- Writable state is created below `TEST_TMPDIR`.
-- Network labs use isolated, process-local Ethernet segments.
+## Highlights
 
-## Installation
+- Deterministic FAT32, raw, GPT, primary MBR, and UEFI El Torito ISO images.
+- Reproducible gzip outputs for remote-cache storage and transfer.
+- Ordered and forbidden serial markers, reboot-spanning phases, and bounded
+  failure hooks.
+- Scripted QMP, GDB, screenshots, keyboard and pointer input, debugcon, and
+  persistent UEFI variable stores.
+- Virtio, USB mass-storage, NVMe, CD-ROM, qcow2, and writable scratch media.
+- Collision-free loopback host forwarding with declared companion programs.
+- Process-local Ethernet segments for multi-guest labs and PCAP capture.
+- KVM with TCG fallback, or an explicit KVM-required run-or-skip policy.
 
-For a version published in the Bazel Central Registry, add the module to
-`MODULE.bazel`:
+## Use from Git
 
-```starlark
-bazel_dep(name = "rules_ostest", version = "0.1.0")
+`rules_ostest` is not published to the Bazel Central Registry. Clone and pin
+the repository, then use a local module override:
+
+```sh
+git clone https://github.com/chitoge/rules_ostest.git third_party/rules_ostest
+git -C third_party/rules_ostest checkout --detach <full-commit-sha>
 ```
 
-To test an unpublished checkout, use the same dependency with a local override:
-
 ```starlark
 bazel_dep(name = "rules_ostest", version = "0.1.0")
+
 local_path_override(
     module_name = "rules_ostest",
-    path = "../rules_ostest",
+    path = "third_party/rules_ostest",
 )
 ```
 
-## Requirements
+The override makes the Git checkout authoritative and prevents a registry
+lookup. A full-SHA `git_override` is available when Bazel should fetch the
+checkout. See [Getting started and execution environments](docs/getting-started.md)
+for both forms.
 
 Use Bazel 8.7.0 or newer, including Bazel 9.x. The module registers a hermetic
 Python 3.12 toolchain through `rules_python`.
 
-Test targets require declared Bazel targets for:
+## QEMU and execution environments
 
-- a QEMU system emulator built for the execution platform;
-- UEFI firmware code for a UEFI boot (optional for direct-kernel boot);
-- an optional UEFI variable-store template.
+| Workload | Local QEMU installation | Remote execution |
+|---|---|---|
+| Image rules | Not required | Compatible through the registered Python toolchain |
+| Default repository tests | Not required | Deterministic QEMU-shaped fixtures; no VM starts |
+| Test label wrapping `/usr/bin/qemu-system-*` | Required on every worker | Non-hermetic |
+| Test label containing a pinned QEMU runtime | Not required | Remote-compatible when the runtime closure is complete |
 
-A static QEMU executable is operationally easy to declare as a Bazel input. A
-dynamically linked executable must include its loader, shared libraries, and
-QEMU data files in runfiles. Firmware and QEMU should be pinned so every worker
-receives the same inputs. Redistributing either one also requires compliance
-with its own license; see [Third-party software and licensing](THIRD_PARTY.md).
+A dynamically linked bundle must declare its ELF loader, shared libraries,
+QEMU modules and data, firmware, and notices. A static QEMU bundle is simpler,
+but its firmware and data files remain explicit inputs. The rules never search
+`PATH` or install QEMU.
 
-## Quick start
+Project CI installs Ubuntu QEMU as a bootstrap, stages its dynamic closure into
+Bazel runfiles, and boots real x86-64 and AArch64 guests in local sandboxed test
+actions. This proves the staged runfile path and real guest behavior. It does
+not prove execution on an actual remote-execution service; the real integration
+targets are tagged `no-remote`.
+
+The [setup guide](docs/getting-started.md) includes:
+
+- commands for a local real-QEMU gate and the authoritative full-matrix list;
+- a content-addressed QEMU bundle layout;
+- an `http_archive` overlay and runfile-aware dynamic-loader wrapper;
+- remote-worker requirements for TCG, sockets, file descriptors, and scratch
+  space; and
+- an exact account of what project CI does and does not verify.
+
+## Minimal UEFI test
 
 Create an EFI System Partition, wrap it in GPT, and boot it:
 
@@ -84,392 +109,59 @@ uefi_disk_image(
 uefi_test(
     name = "kernel_test",
     arch = "x86_64",
-    qemu = "@qemu_x86_64//:qemu-system-x86_64",
-    firmware = "@ovmf//:OVMF_CODE.fd",
-    firmware_vars = "@ovmf//:OVMF_VARS.fd",
+    qemu = "//tools/qemu:qemu_system_x86_64",
+    firmware = "@qemu_linux_x86_64//:firmware/OVMF_CODE.fd",
+    firmware_vars = "@qemu_linux_x86_64//:firmware/OVMF_VARS.fd",
     disk = ":kernel_disk",
-    timeout_seconds = 30,
-)
-```
-
-The default guest protocol is simple:
-
-- `OSTEST: PASS` on the first serial port passes the test.
-- `OSTEST: FAIL`, an unexpected QEMU exit, or a timeout fails the test.
-
-`success_pattern` and `failure_pattern` accept Python regular expressions. The
-serial log and QEMU command line are saved as Bazel undeclared test outputs.
-
-For multi-step protocols, use literal ordered and forbidden markers:
-
-```starlark
-uefi_test(
-    # qemu, firmware, disk, and architecture ...
+    forbidden_markers = ["PANIC", "KERNEL FAULT"],
     success_markers = [
-        "NETSTACK: INTERFACE UP",
-        "FILESERVER: LISTENING",
-        "FILESERVER: RPC OK",
+        "KERNEL: EARLY INIT",
+        "KERNEL: SERVICES READY",
+        "OSTEST: PASS",
     ],
-    forbidden_markers = ["PANIC", "KERNEL FAULT", "OOM"],
+    timeout_seconds = 60,
 )
 ```
 
-Markers may span serial reads. Duplicate markers require distinct
-occurrences, and a forbidden marker fails immediately. `success_markers`,
-`phases`, and an explicit `success_pattern` are mutually exclusive.
+The QEMU and firmware labels are examples from the hermetic bundle pattern in
+the setup guide; this repository does not define or redistribute them.
+
+The legacy default protocol accepts `OSTEST: PASS` and rejects `OSTEST: FAIL`.
+Tests can instead use regular expressions, ordered markers, or reboot phases.
+Every serial test retains `qemu.log` and `qemu-command.txt` as Bazel undeclared
+test outputs.
+
+## Capability guides
+
+| Task | Documentation |
+|---|---|
+| Choose `uefi_test`, `uefi_py_test`, or `uefi_lab_test` | [Test entry points](docs/testing-platforms-and-composition.md#serial-tests) |
+| Configure x86-64, AArch64, KVM/TCG, or direct boot | [Guest platforms and acceleration](docs/testing-platforms-and-composition.md#guest-platforms) |
+| Build FAT, raw, GPT, MBR, and ISO media | [Composing disks](docs/testing-platforms-and-composition.md#composing-disks) |
+| Attach virtio, USB, NVMe, CD-ROM, qcow2, or scratch media | [Attaching boot media](docs/testing-platforms-and-composition.md#attaching-boot-media) |
+| Add QMP/GDB scripts, graphics, or persistent variables | [UEFI testing scenarios](docs/osdev-uefi-use-cases.md) |
+| Probe a guest service through an automatic host forward | [Managed host-to-guest probes](docs/testing-platforms-and-composition.md#managed-host-to-guest-probes) |
+| Run several guests on isolated Ethernet segments | [Local Ethernet labs](docs/osdev-uefi-use-cases.md#local-ethernet-labs) |
+| Diagnose serial, QMP, GDB, symbol, graphics, or network failures | [Debugging UEFI tests](docs/debugging-uefi-tests.md) |
+
+See the [documentation index](docs/README.md) for the recommended reading
+order.
+
+## Scope and policies
+
+QMP, GDB, host forwarding, and lab networking use POSIX process, descriptor,
+loopback, and Unix-socket facilities. Writable state is created below
+`TEST_TMPDIR`; diagnostics and exported media use
+`TEST_UNDECLARED_OUTPUTS_DIR`.
+
+`rules_ostest` is Apache-2.0. QEMU is a separate, consumer-supplied GPLv2
+program. Executing it for tests does not make this project copyleft. A consumer
+that redistributes QEMU, firmware, guest images, a Python runtime, or shared
+libraries must satisfy those artifacts' own licenses; see
+[Third-party software and licensing](THIRD_PARTY.md).
 
-One QEMU process can cover a guest reboot:
-
-```starlark
-uefi_test(
-    # ...
-    phases = [
-        {"markers": ["OTA-SLOT=A", "OTA-APPLIED"], "then": "reboot"},
-        {"markers": ["OTA-SLOT=B", "OTA-COMMITTED"]},
-    ],
-)
-```
-
-The runner advances only on a QMP guest `RESET` event after the current phase
-markers. The timeout covers the complete multi-boot session.
-
-## Acceleration
-
-Tests try KVM first and continue with TCG when KVM is unavailable. This is the
-default:
-
-```text
--accel kvm -accel tcg
-```
-
-Require KVM for a target with:
-
-```starlark
-uefi_test(
-    # ...
-    require_kvm = True,
-    exec_properties = {"requires-kvm": "1"},
-)
-```
-
-To make the KVM-only target a portable run-or-skip gate, add
-`kvm_unavailable = "skip"`. Bazel has no portable skipped-test exit status, so
-the runner writes a skipped JUnit testcase, prints `rules_ostest: SKIP`, and
-returns success. The macro adds the standard `external` tag to disable result
-caching; Bazel's top-level summary may still say `PASSED`. Keep
-`exec_properties` when the scheduler must guarantee KVM, or omit it when a
-KVM-less worker should execute the skip path.
-
-The execution property is executor-specific. Set test timeouts so the test can
-complete under TCG when fallback is enabled.
-
-## Guest architectures
-
-Architecture names and defaults are:
-
-| Architecture | QEMU machine | CPU | UEFI fallback path |
-|---|---|---|---|
-| `x86_64` or `x64` | `q35` | QEMU default | `EFI/BOOT/BOOTX64.EFI` |
-| `aarch64` or `arm64` | `virt` | `max` | `EFI/BOOT/BOOTAA64.EFI` |
-
-Targets may set `arch` directly or use a standard Bazel guest platform with an
-`@platforms//cpu:x86_64` or `@platforms//cpu:aarch64` constraint.
-
-Platform-aware entry points are:
-
-- `platform_uefi_esp_image`
-- `uefi_platform_test`
-- `uefi_py_test(guest_platform = ...)`
-- `uefi_vm(guest_platform = ...)`
-
-QEMU and firmware remain explicit labels because a CPU constraint does not
-identify their repositories.
-
-For a large image or a firmware-independent harness, select direct boot:
-
-```starlark
-uefi_test(
-    name = "direct_aarch64",
-    arch = "aarch64",
-    qemu = "@qemu_aarch64//:qemu-system-aarch64",
-    firmware = None,
-    boot = "direct-kernel",
-    kernel = ":boot_shim",
-    initrd = ":system_image",
-    kernel_args = "console=ttyAMA0",
-)
-```
-
-AArch64 direct boot defaults to `virt,gic-version=2` and `cortex-a53`;
-`machine_options` and `cpu_model` can override them. AArch64 UEFI tests retain
-`virt` and `max`. Consumers supply and pin the real `qemu-system-aarch64` and
-firmware labels.
-
-The fast Bazel matrix uses deterministic QEMU-shaped fixtures. CI separately
-stages declared x86-64 and AArch64 QEMU runtimes, distro UEFI firmware, and
-Ubuntu's prebuilt EFI Shell binaries, then performs uncached boots of generated
-FAT/GPT UEFI images. The guest script reads and writes the FAT filesystem and
-resets each VM; its second boot proves persistence across the QMP-observed
-reset. These gates validate both UEFI fallback paths, ordered serial phases,
-writable-media export, and a named nonvolatile UEFI variable whose exact value
-is read after reset before the variable store is exported. A scripted x86-64
-gate also validates the real GDB stub, paused startup, QMP resume and shutdown,
-serial matching, and framebuffer capture.
-
-Pinned CirrOS 0.6.3 test images provide direct-kernel gates for both guest
-architectures without adding a guest build toolchain. They validate kernel and
-initramfs boot, qcow2 snapshot media, a generated lowercase `cidata` NoCloud
-seed, two virtual CPUs, QEMU user networking, a dynamically allocated SSH
-forward, and scratch-disk write, readback, and export. The x86-64 guest also
-writes a sentinel through the real ISA debug console, and its companion asserts
-that the byte reached the retained artifact. A separate gate waits for the
-guest to power down and requires QEMU to exit successfully; another requires
-real KVM when available and records a skip otherwise. Bazel downloads the
-SHA-256-verified test OS inputs only for these manual CI targets; they are not
-included in this repository or its release artifacts. QEMU uses KVM when
-available and otherwise falls back to TCG.
-
-The media tier mounts a generated ISO through a real SCSI CD-ROM, rejects a
-write to it, and reads sentinels from its embedded FAT image. EFI Shell provides
-the corresponding USB mass-storage and NVMe read-only checks and confirms that
-blank USB/NVMe scratch devices enumerate. This split is intentional: CirrOS's
-small published initramfs omits the USB-storage and NVMe kernel modules.
-
-## Filesystems and images
-
-### FAT32 and fixed layouts
-
-`fat_image` creates a FAT32 filesystem from one-file targets:
-
-```starlark
-load("@rules_ostest//ostest:defs.bzl", "fat_image", "raw_image")
-
-fat_image(
-    name = "data_fs",
-    files = {
-        ":kernel": "boot/kernel.bin",
-        ":configuration": "config/Long File Name.cfg",
-    },
-    size_mb = 64,
-    volume_label = "OSTEST",
-)
-
-raw_image(
-    name = "flash",
-    blobs = {
-        ":stage1": "0",
-        ":stage2": "1MiB",
-        ":metadata": "4096s",
-    },
-    size_mb = 16,
-)
-```
-
-FAT32 images include deterministic timestamps, VFAT long filenames, stable
-8.3 aliases, two FAT copies, FSInfo, and a backup boot sector. `raw_image`
-accepts byte, 512-byte sector, `KiB`, `MiB`, and `GiB` offsets.
-
-### Partitioned disks and optical media
-
-- `uefi_disk_image` creates a GPT disk containing one EFI System Partition.
-- `gpt_partition` and `gpt_image` compose up to 128 partition images.
-- `mbr_partition` and `mbr_image` compose up to four primary partitions.
-- `uefi_iso_image` creates an ISO9660 image with a UEFI El Torito boot image.
-
-Partition rules accept sector-aligned images produced by other Bazel targets.
-GPT GUIDs can be supplied explicitly or derived deterministically from the
-target label. FAT hidden-sector fields can be patched to the assigned start
-LBA.
-
-### Attaching media
-
-`qemu_media` controls how each image appears to the guest:
-
-```starlark
-load(
-    "@rules_ostest//ostest:defs.bzl",
-    "qemu_media",
-    "uefi_test",
-)
-
-uefi_test(
-    name = "media_test",
-    arch = "x86_64",
-    # qemu, firmware, and firmware_vars ...
-    media = [
-        qemu_media(image = ":boot_iso", interface = "cdrom", bootindex = 1),
-        qemu_media(image = ":esp", interface = "usb-storage", bootindex = 2),
-        qemu_media(image = ":data_disk", interface = "nvme", bootindex = 3),
-    ],
-)
-```
-
-Supported interfaces are `virtio-blk`, `usb-storage`, `nvme`, and `cdrom`.
-Non-`None` boot indices must be unique. The `disk` attribute is shorthand for
-one raw, snapshot-backed `virtio-blk` device. A test may omit all media for a
-firmware or embedded-shell boot.
-
-Generated images use an explicit raw guest format. Their Bazel outputs are
-`.fat.gz`, `.img.gz`, or `.iso.gz` by default. The test harness expands them
-below `TEST_TMPDIR` immediately before QEMU starts. A declared qcow2 input can
-be attached with `image_format = "qcow2"`.
-
-Use a fresh writable disk when the test needs to inspect durable guest state:
-
-```starlark
-load("@rules_ostest//ostest:defs.bzl", "qemu_scratch_disk")
-
-uefi_test(
-    # ...
-    media = [
-        qemu_scratch_disk(name = "state", size_mb = 64, export = True),
-    ],
-)
-```
-
-The sparse raw image is created below `TEST_TMPDIR`; an exported copy named
-`ostest-media-<index>-<name>.img` is published after QEMU stops, on both pass
-and failure. `qemu_media(..., readonly=False, snapshot=False, export=True)`
-does the same for a seeded input without mutating its runfile. In a
-`uefi_py_test`, use `session.media_path(name)` after QEMU stops and
-`session.export_media(name, path)`. The guest must flush its own caches before
-its terminal marker.
-
-## Scripted and graphical tests
-
-Use `uefi_py_test` for QMP commands, screenshots, keyboard or mouse input,
-source debugging, custom protocols, and multi-boot variable tests. It supplies
-the public `QemuSession` library and the complete set of declared QEMU inputs.
-
-```python
-import argparse
-import os
-import pathlib
-
-from ostest.python.qemu import QemuSession, UefiQemuConfig, add_uefi_qemu_arguments
-
-parser = argparse.ArgumentParser()
-add_uefi_qemu_arguments(parser)
-config = UefiQemuConfig.from_namespace(parser.parse_args())
-
-outputs = pathlib.Path(os.environ["TEST_UNDECLARED_OUTPUTS_DIR"])
-with QemuSession(config) as vm:
-    vm.wait_for_serial(r"FRAME_READY", timeout=30)
-    vm.screendump(outputs / "screen.ppm")
-```
-
-`QemuSession.execute()` accepts arbitrary QMP commands. Optional target
-features include:
-
-- `gdb = True` for an ephemeral loopback GDB endpoint;
-- `pause_at_start = True` to start the VM paused;
-- `debugcon = True` for x86 OVMF debug output on port `0x402`;
-- a writable variable store that can be reused across sessions and exported.
-
-For a simple serial framebuffer gate, the lower-level QMP script is optional:
-
-```starlark
-uefi_test(
-    # ...
-    graphics = True,
-    success_markers = ["FRAMEBUFFER READY"],
-    screendump_not_blank = True,
-    screendump_min_distinct_pixels = 2,
-)
-```
-
-The guest gets `VGA` on x86-64 or `virtio-gpu-pci` on AArch64 while QEMU stays
-host-headless. `screendump.ppm` is retained, and malformed, blank, or
-insufficiently varied images fail the test.
-
-Descriptor-based QMP, GDB, and network connections require a POSIX execution
-worker.
-
-## Managed host-to-guest forwards
-
-`qemu_hostfwd` lets a declared one-shot host probe connect to a guest service
-without hard-coded ports:
-
-```starlark
-load("@rules_ostest//ostest:defs.bzl", "qemu_hostfwd", "uefi_test")
-
-uefi_test(
-    # ...
-    hostfwd = [qemu_hostfwd(name = "grpc", guest = 50051)],
-    host_companion = "//tools:grpc_probe",
-    success_markers = ["FILESERVER READY"],
-)
-```
-
-QEMU binds port zero on `127.0.0.1` and retains the selected socket; the
-runner discovers the concrete port through QMP, avoiding a reserve/close/rebind
-race. User networking is `restrict=on`. The companion receives
-`OSTEST_HOSTFWD_JSON`, plus `OSTEST_HOST`, `OSTEST_PORT`,
-`OSTEST_GUEST_PORT`, and `OSTEST_PROTOCOL` for one mapping. PASS requires both
-the guest verdict and companion exit zero. Diagnostics include
-`hostfwd.json`, `host-companion.log`, and a companion artifact directory.
-
-This is a host-to-guest client/probe facility. It does not let a guest reach a
-host package server; that opposite direction needs a separate guest-forward
-or pre-opened-listener design.
-
-## Failure diagnostics
-
-`qemu.log` and `qemu-command.txt` are stable undeclared test artifacts on every
-serial-test outcome. The runner fails and stops a guest that produces more
-than 256 MiB of serial output, preventing an unbounded diagnostic artifact. A
-declared diagnostic tool can process the closed serial log before failure is
-reported:
-
-```starlark
-uefi_test(
-    # ...
-    on_failure = "//tools:symbolize_serial",
-    on_failure_timeout_seconds = 30,
-)
-```
-
-The tool receives the absolute log path as its only argument and through
-`OSTEST_SERIAL_LOG`; it runs without a shell. A hook timeout or nonzero status
-is reported as a warning and never replaces the original failure.
-
-See [Debugging UEFI tests](docs/debugging-uefi-tests.md) for artifact triage,
-QMP state capture, relocated symbols, automated GDB sessions, and multi-VM
-failure diagnosis.
-
-## Local network labs
-
-`uefi_lab_test` owns several `uefi_vm` participants in one Bazel test. Named
-`qemu_network` attachments connect them through isolated Ethernet segments.
-The Python test can address every `QemuSession` and join a segment as a raw
-Ethernet endpoint.
-
-This supports client/server tests, DHCP/TFTP services, network boot, multiple
-NICs, multiple segments, and x86-64/AArch64 guest combinations. Each segment
-produces a PCAP in undeclared test outputs.
-
-See [UEFI testing scenarios](docs/osdev-uefi-use-cases.md#local-ethernet-labs)
-for a complete BUILD and Python example.
-
-## Guides
-
-- [Debugging UEFI tests](docs/debugging-uefi-tests.md)
-- [Testing, guest platforms, and image composition](docs/testing-platforms-and-composition.md)
-- [UEFI testing scenarios](docs/osdev-uefi-use-cases.md)
-
-## License and project policies
-
-`rules_ostest` is licensed under Apache-2.0. QEMU is a separate,
-consumer-supplied GNU GPL version 2 program: this project executes it as a
-child process, and the source distribution does not link with or include it.
-Using QEMU for tests does not make `rules_ostest` copyleft. Distributing a QEMU
-binary or firmware
-alongside a product does create separate compliance duties; see
-[THIRD_PARTY.md](THIRD_PARTY.md) for the boundary and upstream references.
-
-- [License](LICENSE) and [notices](NOTICE)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
-# rules_ostest
+- [License](LICENSE) and [notices](NOTICE)

@@ -21,3 +21,5 @@ Notable user-visible changes are recorded here.
   exported disk artifacts.
 - Preserve requested FAT volume-label casing, including lowercase NoCloud
   `cidata` labels.
+- Document Git-only consumption and distinguish local system QEMU, staged
+  runfiles, and content-pinned remote-execution bundles.

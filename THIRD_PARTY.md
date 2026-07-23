@@ -13,6 +13,9 @@ The Bazel module has two direct build dependencies and one root-only development
 dependency. Bazel fetches them from the Bazel Central Registry; they are not
 included in a `rules_ostest` source archive:
 
+This registry use applies only to upstream dependencies. `rules_ostest` itself
+is consumed from Git/local overrides and is not published to the registry.
+
 | Dependency | Version | License | Purpose |
 |---|---:|---|---|
 | `rules_python` | 2.2.0 | Apache-2.0 | Python rules and toolchain registration |
