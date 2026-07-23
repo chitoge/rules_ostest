@@ -167,7 +167,7 @@ jobs:
               fi
             done < <(
               find -L bazel-testlogs -type f \
-                \( -name test.log -o -name qemu.log \) \
+                \( -name test.log -o -name '*qemu.log' \) \
                 -size +0c |
                 sort |
                 head -n 20

@@ -604,9 +604,23 @@ def _run_qemu(
         )
     except BaseException as error:
         stop_process_group(process)
+        with log_path.open("ab") as log:
+            while True:
+                try:
+                    chunk = os.read(process.stdout.fileno(), 64 * 1024)
+                except BlockingIOError:
+                    break
+                if not chunk:
+                    break
+                log.write(chunk)
+                _append_output_tail(output_tail, chunk)
         if companion is not None:
             companion.terminate()
-        return RunResult(False, f"runner orchestration failed: {error}", bytes(output_tail).decode("utf-8", errors="replace"))
+        return RunResult(
+            False,
+            f"runner orchestration failed: {error}",
+            bytes(output_tail).decode("utf-8", errors="replace"),
+        )
     finally:
         if qmp_file is not None:
             qmp_file.close()

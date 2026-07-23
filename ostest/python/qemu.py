@@ -781,7 +781,8 @@ class QemuSession:
             shlex.join(command) + "\n",
             encoding="utf-8",
         )
-        self._serial_log = (artifacts_dir / f"{self.config.name}-qemu.log").open("wb")
+        serial_log_path = artifacts_dir / f"{self.config.name}-qemu.log"
+        self._serial_log = serial_log_path.open("wb")
         environment = dict(os.environ)
         environment.update(
             {
@@ -826,8 +827,30 @@ class QemuSession:
             self.execute("qmp_capabilities", timeout=self.startup_timeout)
             self._host_forwards = self._resolve_host_forwards(timeout=self.startup_timeout)
             return self
-        except BaseException:
+        except BaseException as error:
+            process = self.process
             self.terminate()
+            if process is not None and process.stdout is not None:
+                try:
+                    captured_output = process.stdout.read()
+                except OSError:
+                    captured_output = b""
+                finally:
+                    process.stdout.close()
+                if captured_output:
+                    with serial_log_path.open("ab") as serial_log:
+                        serial_log.write(captured_output)
+            try:
+                with serial_log_path.open("rb") as serial_log:
+                    serial_log.seek(0, os.SEEK_END)
+                    serial_log.seek(max(0, serial_log.tell() - 64 * 1024))
+                    output_tail = serial_log.read().decode("utf-8", errors="replace").strip()
+            except OSError:
+                output_tail = ""
+            if output_tail:
+                raise RuntimeError(
+                    f"{error}\n--- QEMU output tail ---\n{output_tail}"
+                ) from error
             raise
         finally:
             listener.close()
