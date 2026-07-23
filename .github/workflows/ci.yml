@@ -143,5 +143,34 @@ jobs:
                 '
             )
             echo "::error title=Real QEMU test output::${failure_summary}"
+            while IFS= read -r diagnostic_log; do
+              diagnostic_summary=$(
+                tail -n 100 "${diagnostic_log}" |
+                  awk '
+                    BEGIN { remaining = 20000 }
+                    {
+                      gsub(/%/, "%25")
+                      gsub(/\r/, "%0D")
+                      line = $0 "%0A"
+                      if (length(line) > remaining) {
+                        printf "%s", substr(line, 1, remaining)
+                        exit
+                      }
+                      printf "%s", line
+                      remaining -= length(line)
+                    }
+                  '
+              )
+              if [[ -n "${diagnostic_summary}" ]]; then
+                diagnostic_name=${diagnostic_log#bazel-testlogs/}
+                echo "::error title=${diagnostic_name}::${diagnostic_summary}"
+              fi
+            done < <(
+              find -L bazel-testlogs -type f \
+                \( -name test.log -o -name qemu.log \) \
+                -size +0c |
+                sort |
+                head -n 20
+            )
           fi
           exit "${bazel_status}"
