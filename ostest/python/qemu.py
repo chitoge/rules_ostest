@@ -42,6 +42,10 @@ class QmpError(RuntimeError):
     """A QMP command returned an error response."""
 
 
+class _QmpConnectionClosed(RuntimeError):
+    """The QMP peer disconnected before sending a complete response."""
+
+
 def _locate(locator: runfiles.Runfiles, value: str) -> pathlib.Path:
     if os.path.isabs(value):
         raise ValueError(f"expected a runfiles-relative path, got {value!r}")
@@ -813,10 +817,18 @@ class QemuSession:
         if remaining <= 0:
             raise TimeoutError("timed out waiting for a QMP response")
         self._qmp_socket.settimeout(remaining)
-        line = self._qmp_file.readline()
+        try:
+            line = self._qmp_file.readline()
+        except ConnectionError as error:
+            status = self.process.poll() if self.process is not None else None
+            raise _QmpConnectionClosed(
+                f"QMP connection failed; QEMU status is {status}"
+            ) from error
         if not line:
             status = self.process.poll() if self.process is not None else None
-            raise RuntimeError(f"QMP connection closed; QEMU status is {status}")
+            raise _QmpConnectionClosed(
+                f"QMP connection closed; QEMU status is {status}"
+            )
         try:
             message = json.loads(line)
         except json.JSONDecodeError as error:
@@ -843,7 +855,27 @@ class QemuSession:
         self._qmp_file.write(json.dumps(request, separators=(",", ":")).encode("utf-8") + b"\n")
         deadline = time.monotonic() + timeout
         while True:
-            response = self._read_qmp_message(deadline)
+            try:
+                response = self._read_qmp_message(deadline)
+            except _QmpConnectionClosed as error:
+                # QEMU can close a TCP-backed QMP monitor immediately after
+                # accepting "quit", before the empty success response reaches
+                # the client. Treat that race as success only after the process
+                # itself exits cleanly.
+                if command != "quit" or self.process is None:
+                    raise
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                try:
+                    status = self.process.wait(timeout=remaining)
+                except subprocess.TimeoutExpired:
+                    raise error
+                if status != 0:
+                    raise RuntimeError(
+                        f"QEMU exited with unexpected status {status} after QMP quit"
+                    ) from error
+                return {}
             if "event" in response:
                 self._events.append(response)
                 continue

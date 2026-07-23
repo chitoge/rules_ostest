@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import pathlib
 import socket
+import struct
 import sys
 
 
@@ -57,6 +58,15 @@ def main() -> int:
             elif command == "screendump":
                 pathlib.Path(request["arguments"]["filename"]).write_bytes(b"P6\n1 1\n255\n\x12\x34\x56")
                 result = {}
+            elif command == "quit":
+                # Exercise QEMU's fast-exit race: a TCP-backed QMP monitor can
+                # reset before the final empty response reaches the client.
+                connection.setsockopt(
+                    socket.SOL_SOCKET,
+                    socket.SO_LINGER,
+                    struct.pack("ii", 1, 0),
+                )
+                return 0
             else:
                 response = {
                     "error": {"class": "CommandNotFound", "desc": command},

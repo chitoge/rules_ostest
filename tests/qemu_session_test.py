@@ -29,6 +29,8 @@ def main() -> int:
         assert screenshot.read_bytes() == b"P6\n1 1\n255\n\x12\x34\x56"
         exported_vars = session.export_firmware_vars(output_dir / "exported-vars.fd")
         assert exported_vars.read_bytes() == b"serial_baud=115200\nresult_protocol=OSTEST\n"
+        assert session.execute("quit") == {}
+        assert session.wait_for_exit(timeout=2) == 0
     return 0
 
 
