@@ -372,6 +372,7 @@ uefi_test(
     ],
     qemu = ":fake_advanced_qemu",
     qemu_args = ["--fake-advanced=direct"],
+    qemu_firmware_dir = "testdata/dummy.efi",
     success_markers = [
         "DIRECT-START",
         "DIRECT-DONE",
@@ -396,6 +397,7 @@ uefi_platform_test(
     ],
     qemu = ":fake_advanced_qemu",
     qemu_args = ["--fake-advanced=direct"],
+    qemu_firmware_dir = "testdata/dummy.efi",
     success_markers = [
         "DIRECT-START",
         "DIRECT-DONE",

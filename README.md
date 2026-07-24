@@ -6,9 +6,11 @@ serial and Python/QMP tests, writable-media readback, graphics, managed host
 forwards, persistent variables, and isolated multi-VM networks.
 
 The library rules keep emulators and firmware outside their implementation.
-Image actions do not need QEMU. A real guest test receives QEMU and firmware as
-explicit Bazel labels. This repository's manual integration targets use a
-test-only, content-pinned runtime; consumers remain free to supply their own.
+Image actions do not need QEMU. A real guest test receives QEMU and any UEFI
+firmware as explicit Bazel labels; `qemu_firmware_dir` declares an emulator's
+external BIOS and option-ROM data when needed. This repository's manual
+integration targets use a test-only, content-pinned runtime; consumers remain
+free to supply their own.
 
 ## Highlights
 

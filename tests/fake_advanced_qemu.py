@@ -23,6 +23,11 @@ def _mode(arguments: list[str]) -> str:
 
 def _direct(arguments: list[str]) -> int:
     errors = []
+    firmware_directories = _values(arguments, "-L")
+    if len(firmware_directories) != 1:
+        errors.append(f"expected one declared QEMU firmware directory, got {firmware_directories}")
+    elif pathlib.Path(firmware_directories[0]).name != "testdata":
+        errors.append(f"unexpected QEMU firmware directory: {firmware_directories[0]}")
     if _values(arguments, "-machine") != ["virt,gic-version=2"]:
         errors.append(f"unexpected machine: {_values(arguments, '-machine')}")
     if _values(arguments, "-cpu") != ["cortex-a53"]:

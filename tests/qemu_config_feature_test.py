@@ -77,6 +77,7 @@ class QemuConfigFeatureTest(unittest.TestCase):
         self.outputs = self.root / "outputs"
         self.tmp.mkdir()
         self.outputs.mkdir()
+        (self.root / "qemu-data").mkdir()
         for name, data in {
             "qemu": b"executable",
             "firmware.fd": b"firmware",
@@ -85,6 +86,7 @@ class QemuConfigFeatureTest(unittest.TestCase):
             "initrd": b"initrd",
             "disk.img": b"source disk",
             "arch.txt": b"aarch64\n",
+            "qemu-data/.rules_ostest_dir": b"",
         }.items():
             (self.root / name).write_bytes(data)
         self.environment = mock.patch.dict(
@@ -122,6 +124,7 @@ class QemuConfigFeatureTest(unittest.TestCase):
             "ostest_machine_option": [],
             "ostest_pause_at_start": False,
             "ostest_qemu": "qemu",
+            "ostest_qemu_firmware_dir": None,
             "ostest_qemu_arg": [],
             "ostest_require_kvm": False,
         }
@@ -198,6 +201,7 @@ class QemuConfigFeatureTest(unittest.TestCase):
             [
                 "--ostest-arch=aarch64",
                 "--ostest-qemu=qemu",
+                "--ostest-qemu-firmware-dir=qemu-data/.rules_ostest_dir",
                 "--ostest-boot=direct-kernel",
                 "--ostest-kernel=kernel",
                 "--ostest-initrd=initrd",
@@ -212,6 +216,24 @@ class QemuConfigFeatureTest(unittest.TestCase):
         self.assertTrue(config.allow_reboot)
         self.assertTrue(config.graphics)
         self.assertEqual(config.cpu_model, "cortex-a72")
+        self.assertEqual(config.qemu_firmware_dir, self.root / "qemu-data")
+        command = config.command()
+        self.assertEqual(command[command.index("-L") + 1], str(self.root / "qemu-data"))
+
+    def test_firmware_directory_rejects_raw_qemu_L_argument(self):
+        with self.assertRaisesRegex(ValueError, "cannot be combined"):
+            UefiQemuConfig.from_namespace(
+                self.namespace(
+                    ostest_qemu_firmware_dir="qemu-data/.rules_ostest_dir",
+                    ostest_qemu_arg=["-L", "/host/qemu"],
+                )
+            )
+
+    def test_firmware_directory_label_must_resolve_to_a_file(self):
+        with self.assertRaisesRegex(ValueError, "marker file"):
+            UefiQemuConfig.from_namespace(
+                self.namespace(ostest_qemu_firmware_dir="qemu-data")
+            )
 
     def test_direct_aarch64_defaults_render_kernel_initrd_graphics_and_reboots(self):
         command = self.direct_config(graphics=True, allow_reboot=True).command()
@@ -447,6 +469,7 @@ class QemuConfigFeatureTest(unittest.TestCase):
             "name": "arm",
             "arch": "aarch64",
             "qemu": "qemu",
+            "qemu_firmware_dir": "qemu-data/.rules_ostest_dir",
             "firmware": None,
             "boot": "direct-kernel",
             "kernel": "kernel",
@@ -469,6 +492,7 @@ class QemuConfigFeatureTest(unittest.TestCase):
         self.assertTrue(config.allow_reboot)
         self.assertEqual(config.graphics_device, "ramfb")
         self.assertIsNone(config.hostfwd[0].host_port)
+        self.assertEqual(config.qemu_firmware_dir, self.root / "qemu-data")
 
 
 if __name__ == "__main__":

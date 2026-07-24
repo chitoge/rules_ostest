@@ -218,11 +218,32 @@ because Bazel has no portable skipped-test status; the target receives the
 All single-VM entry points accept `boot = "direct-kernel"`, a required
 `kernel`, an optional `initrd`, and literal `kernel_args`. Omit `firmware`
 entirely in this mode; explicitly passing `firmware = None` remains equivalent.
+
+```starlark
+uefi_test(
+    name = "direct_kernel_test",
+    arch = "x86_64",
+    boot = "direct-kernel",
+    qemu = "//tools/qemu:qemu_system_x86_64",
+    qemu_firmware_dir = "@qemu_linux_x86_64//:qemu_firmware_dir",
+    kernel = ":vmlinuz",
+    initrd = ":initramfs",
+    kernel_args = "console=ttyS0",
+    success_markers = ["OSTEST: PASS"],
+)
+```
+
 AArch64 direct boot defaults to `virt,gic-version=2` and `cortex-a53`, matching
 a conservative real-QEMU boot profile; callers may set `machine_options` and
-`cpu_model`. An x86 QEMU machine can still consume SeaBIOS from its runtime data
-directory, but that is part of the QEMU bundle rather than a test `firmware`
-label. QEMU and all payloads remain declared runfiles for the execution worker.
+`cpu_model`. An x86 QEMU machine can still require SeaBIOS and option ROMs from
+its runtime data directory. Set `qemu_firmware_dir` to a marker-file target
+inside that directory; `rules_ostest` location-expands the marker and supplies
+its parent to QEMU with `-L`. The target should carry the complete QEMU data
+closure in its runfiles. This runtime data is separate from the optional test
+`firmware` label. QEMU and all payloads remain declared runfiles for the
+execution worker. See [Supply QEMU from a consuming
+repository](getting-started.md#supply-qemu-from-a-consuming-repository) for a
+complete target definition.
 
 ## Composing disks
 

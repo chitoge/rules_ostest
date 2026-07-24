@@ -639,6 +639,7 @@ def _parser() -> argparse.ArgumentParser:
     architecture.add_argument("--arch", choices=("x86_64", "aarch64"))
     architecture.add_argument("--arch-file")
     parser.add_argument("--qemu", required=True)
+    parser.add_argument("--qemu-firmware-dir")
     parser.add_argument("--firmware")
     parser.add_argument("--firmware-vars")
     parser.add_argument("--disk")
@@ -723,6 +724,7 @@ def main() -> int:
             ostest_memory_mb=args.memory_mb,
             ostest_pause_at_start=False,
             ostest_qemu=args.qemu,
+            ostest_qemu_firmware_dir=args.qemu_firmware_dir,
             ostest_qemu_arg=args.qemu_arg,
             ostest_require_kvm=args.require_kvm,
         )

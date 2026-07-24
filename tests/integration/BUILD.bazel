@@ -13,6 +13,8 @@ load(
 
 package(default_visibility = ["//visibility:private"])
 
+_QEMU_FIRMWARE_DIR = "@qemu_noble_x86_64//:qemu_firmware_dir"
+
 exports_files([
     "qemu_noble.lock.json",
     "qemu_noble.yaml",
@@ -232,6 +234,7 @@ uefi_test(
         },
     ],
     qemu = ":qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     screendump_not_blank = True,
     tags = [
         "external",
@@ -279,6 +282,7 @@ uefi_test(
         },
     ],
     qemu = ":qemu_system_aarch64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     tags = [
         "external",
         "manual",
@@ -301,6 +305,7 @@ uefi_py_test(
     memory_mb = 128,
     pause_at_start = True,
     qemu = ":qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     tags = [
         "external",
         "manual",
@@ -349,6 +354,7 @@ uefi_test(
     ],
     memory_mb = 384,
     qemu = ":qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     success_markers = [
         "OSTEST: CLOUD USERDATA",
         "OSTEST: CLOUD CPUS 2",
@@ -404,6 +410,7 @@ uefi_test(
     ],
     memory_mb = 512,
     qemu = ":qemu_system_aarch64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     success_markers = [
         "OSTEST: CLOUD USERDATA",
         "OSTEST: CLOUD CPUS 2",
@@ -457,6 +464,7 @@ uefi_test(
     ],
     memory_mb = 384,
     qemu = ":qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     require_kvm = True,
     success_markers = [
         "Hypervisor detected: KVM",
@@ -507,6 +515,7 @@ uefi_py_test(
     ],
     memory_mb = 256,
     qemu = ":qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     tags = [
         "external",
         "manual",
@@ -552,6 +561,7 @@ uefi_py_test(
     ],
     memory_mb = 384,
     qemu = ":qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     tags = [
         "external",
         "manual",

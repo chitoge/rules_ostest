@@ -26,5 +26,7 @@ Notable user-visible changes are recorded here.
   without host installation.
 - Allow direct-kernel callers to omit the `firmware` argument from every
   single-VM entry point.
+- Add `qemu_firmware_dir` to declare and location-expand QEMU's firmware/data
+  directory for UEFI and direct-kernel tests.
 - Document Git-only consumption and distinguish the repository's pinned test
   runtime from consumer-owned remote-execution bundles.

@@ -264,10 +264,15 @@ def _validate_hostfwd(hostfwd, qemu_args):
             if argument in ["-net", "-netdev", "-nic"]:
                 fail("managed hostfwd cannot be combined with %s in qemu_args" % argument)
 
+def _validate_qemu_firmware_dir(qemu_firmware_dir, qemu_args):
+    if qemu_firmware_dir != None and "-L" in qemu_args:
+        fail("qemu_firmware_dir cannot be combined with -L in qemu_args")
+
 def uefi_vm(
         name,
         qemu,
         firmware = None,
+        qemu_firmware_dir = None,
         arch = None,
         guest_platform = None,
         disk = None,
@@ -295,6 +300,9 @@ def uefi_vm(
       name: Unique participant name within the lab.
       qemu: Label of the QEMU system executable for the execution platform.
       firmware: Optional firmware-code label; required only for UEFI boot.
+      qemu_firmware_dir: Optional label of a marker file placed directly inside
+        QEMU's declared firmware/data directory. The target's runfiles should
+        contain that directory's complete data closure.
       arch: Guest architecture name. Exactly one of arch and guest_platform is
         required.
       guest_platform: Bazel platform used to infer and transition guest inputs.
@@ -336,6 +344,7 @@ def uefi_vm(
     if cpu_model != None and (not cpu_model or "," in cpu_model):
         fail("cpu_model must be a non-empty QEMU model name without commas")
     _validate_boot(firmware, boot, kernel, initrd, kernel_args)
+    _validate_qemu_firmware_dir(qemu_firmware_dir, qemu_args)
     _validate_media(disk, media)
     for medium in media:
         if medium.export:
@@ -366,6 +375,7 @@ def uefi_vm(
         networks = networks,
         pause_at_start = pause_at_start,
         qemu = qemu,
+        qemu_firmware_dir = qemu_firmware_dir,
         qemu_args = qemu_args,
         require_kvm = require_kvm,
     )
@@ -444,6 +454,7 @@ def _define_uefi_test(
         name,
         qemu,
         firmware,
+        qemu_firmware_dir = None,
         disk = None,
         media = [],
         arch = None,
@@ -541,6 +552,7 @@ def _define_uefi_test(
     if cpu_model != None and (not cpu_model or "," in cpu_model):
         fail("cpu_model must be a non-empty QEMU model name without commas")
     _validate_boot(firmware, boot, kernel, initrd, kernel_args)
+    _validate_qemu_firmware_dir(qemu_firmware_dir, qemu_args)
     _validate_media(disk, media)
     _validate_hostfwd(hostfwd, qemu_args)
     if phases:
@@ -581,6 +593,9 @@ def _define_uefi_test(
             "then": phase.get("then", "complete"),
         })))
     runtime_data = [qemu] + test_data
+    if qemu_firmware_dir != None:
+        runner_args.append("--qemu-firmware-dir=" + _shell_quote("$(rlocationpath %s)" % qemu_firmware_dir))
+        runtime_data.append(qemu_firmware_dir)
     if firmware != None:
         runner_args.append("--firmware=" + _shell_quote("$(rlocationpath %s)" % firmware))
         runtime_data.append(firmware)
@@ -646,6 +661,7 @@ def uefi_test(
         arch,
         qemu,
         firmware = None,
+        qemu_firmware_dir = None,
         disk = None,
         media = [],
         firmware_vars = None,
@@ -694,13 +710,15 @@ def uefi_test(
     require_kvm=True to omit TCG. kvm_unavailable="skip" records a skipped
     JUnit testcase and returns success when the host cannot provide KVM.
     firmware is required for UEFI boot and may be omitted for direct-kernel
-    boot.
+    boot. qemu_firmware_dir is a marker-file label whose parent is passed to
+    QEMU as -L; its target should carry the complete firmware/data closure.
     """
     _define_uefi_test(
         name = name,
         arch = arch,
         qemu = qemu,
         firmware = firmware,
+        qemu_firmware_dir = qemu_firmware_dir,
         disk = disk,
         media = media,
         firmware_vars = firmware_vars,
@@ -743,6 +761,7 @@ def uefi_platform_test(
         guest_platform,
         qemu,
         firmware = None,
+        qemu_firmware_dir = None,
         disk = None,
         media = [],
         firmware_vars = None,
@@ -783,7 +802,8 @@ def uefi_platform_test(
     Only guest inputs use the platform transition. The Python/QEMU harness keeps
     its normal configuration so that the test remains executable on its worker.
     firmware is required for UEFI boot and may be omitted for direct-kernel
-    boot.
+    boot. qemu_firmware_dir is a marker-file label whose parent is passed to
+    QEMU as -L; its target should carry the complete firmware/data closure.
     """
     arch_target = name + "__guest_arch"
     _guest_arch_file(
@@ -796,6 +816,7 @@ def uefi_platform_test(
         arch_file = ":" + arch_target,
         qemu = qemu,
         firmware = firmware,
+        qemu_firmware_dir = qemu_firmware_dir,
         disk = disk,
         media = media,
         firmware_vars = firmware_vars,
@@ -839,6 +860,7 @@ def uefi_py_test(
         main,
         qemu,
         firmware = None,
+        qemu_firmware_dir = None,
         disk = None,
         media = [],
         arch = None,
@@ -877,6 +899,9 @@ def uefi_py_test(
       main: Python entry point passed to py_test.
       qemu: Label of the QEMU system executable for the execution platform.
       firmware: Optional firmware-code label; required only for UEFI boot.
+      qemu_firmware_dir: Optional label of a marker file placed directly inside
+        QEMU's declared firmware/data directory. The target's runfiles should
+        contain that directory's complete data closure.
       disk: Optional raw boot disk shorthand with boot index 1.
       media: List of qemu_media configurations.
       arch: Guest architecture name. Exactly one of arch and guest_platform is
@@ -918,6 +943,7 @@ def uefi_py_test(
     if cpu_model != None and (not cpu_model or "," in cpu_model):
         fail("cpu_model must be a non-empty QEMU model name without commas")
     _validate_boot(firmware, boot, kernel, initrd, kernel_args)
+    _validate_qemu_firmware_dir(qemu_firmware_dir, qemu_args)
     _validate_media(disk, media)
     for medium in media:
         if medium.export:
@@ -946,6 +972,9 @@ def uefi_py_test(
         "--ostest-memory-mb=%d" % memory_mb,
         "--ostest-cpus=%d" % cpus,
     ])
+    if qemu_firmware_dir != None:
+        runtime_data.append(qemu_firmware_dir)
+        runtime_args.append("--ostest-qemu-firmware-dir=" + _shell_quote("$(rlocationpath %s)" % qemu_firmware_dir))
     if firmware != None:
         runtime_data.append(firmware)
         runtime_args.append("--ostest-firmware=" + _shell_quote("$(rlocationpath %s)" % firmware))
@@ -1059,6 +1088,10 @@ def uefi_lab_test(
             fail("duplicate VM name %r" % vm.name)
         seen_names[vm.name] = True
         runtime_data.append(vm.qemu)
+        qemu_firmware_dir = None
+        if vm.qemu_firmware_dir != None:
+            runtime_data.append(vm.qemu_firmware_dir)
+            qemu_firmware_dir = "$(rlocationpath %s)" % vm.qemu_firmware_dir
         firmware = None
         if vm.firmware != None:
             runtime_data.append(vm.firmware)
@@ -1124,6 +1157,7 @@ def uefi_lab_test(
             "networks": networks,
             "pause_at_start": vm.pause_at_start,
             "qemu": "$(rlocationpath %s)" % vm.qemu,
+            "qemu_firmware_dir": qemu_firmware_dir,
             "qemu_args": vm.qemu_args,
             "require_kvm": vm.require_kvm,
         }

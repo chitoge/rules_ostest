@@ -54,9 +54,11 @@ repository's default `bazel test //...` suite uses QEMU-shaped test fixtures,
 so it also runs without QEMU, firmware, KVM, or a guest operating system.
 
 Real guest targets are different: every `uefi_test`, `uefi_py_test`, or
-`uefi_vm` receives a `qemu` label, and UEFI targets also receive firmware
-labels. The rules execute those declared inputs; they do not search `PATH`,
-install packages, or download an emulator automatically.
+`uefi_vm` receives a `qemu` label. A hermetic QEMU bundle that uses external
+BIOS, option-ROM, or keymap data also supplies `qemu_firmware_dir`, while UEFI
+targets receive their platform firmware labels separately. The rules execute
+those declared inputs; they do not search `PATH`, install packages, or download
+an emulator automatically.
 
 | Workload | Host installation needed? | Remote-execution status |
 |---|---|---|
@@ -73,7 +75,7 @@ No local QEMU, firmware, EFI toolchain, or `apt` installation is needed. Bazel
 fetches the same pinned runtime used by CI:
 
 ```sh
-bazel fetch @qemu_noble_x86_64//:runtime
+bazel fetch @qemu_noble_x86_64//:qemu_firmware_dir
 
 bazel test \
   --local_test_jobs=1 \
@@ -90,12 +92,15 @@ archives under Bazel's external-repository directory; it does not write
 binaries into the source checkout. Subsequent workspaces can reuse Bazel's
 repository cache.
 
-The launcher resolves QEMU through Bazel runfiles, invokes the pinned closure's
-own ELF loader, and supplies only its declared library and QEMU-data paths.
-The data view includes the closure's SeaBIOS and iPXE option ROMs, so QEMU does
-not fall back to host firmware-data paths. These runtime files do not make the
-test-level `firmware` label mandatory for direct-kernel boot. The launcher never
-searches `PATH`. OVMF/AAVMF and the EFI Shell are labels from the same
+The launcher resolves QEMU through Bazel runfiles and invokes the pinned
+closure's own ELF loader with its declared library path. Each real target sets
+`qemu_firmware_dir` to the runtime's marker target, so `rules_ostest` resolves
+that marker through runfiles and passes its parent to QEMU with `-L`. The
+marker target also carries the complete runtime as runfiles. The resulting
+data view includes the closure's SeaBIOS and iPXE option ROMs, so QEMU does not
+fall back to host firmware-data paths. These runtime files do not make the
+test-level `firmware` label mandatory for direct-kernel boot. The launcher
+never searches `PATH`. OVMF/AAVMF and the EFI Shell are labels from the same
 repository. This makes the inputs content-pinned; the Linux kernel ABI and the
 sandbox's process/socket/resource policy remain execution-platform
 requirements.
@@ -154,6 +159,7 @@ qemu-linux-x86_64/
     usr/lib/x86_64-linux-gnu/qemu/*.so
     usr/bin/qemu-system-x86_64
     usr/bin/qemu-system-aarch64
+    usr/share/qemu/.rules_ostest_dir
     usr/share/qemu/**
   firmware/
     OVMF_CODE.fd
@@ -202,6 +208,13 @@ filegroup(
         "licenses/**",
         "runtime/**",
     ]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "qemu_firmware_dir",
+    srcs = ["runtime/usr/share/qemu/.rules_ostest_dir"],
+    data = [":runtime"],
     visibility = ["//visibility:public"],
 )
 
@@ -265,8 +278,6 @@ if locator is None:
 prefix = "qemu_linux_x86_64/runtime"
 loader = required(locator, f"{prefix}/lib64/ld-linux-x86-64.so.2")
 qemu = required(locator, f"{prefix}/usr/bin/qemu-system-x86_64")
-qemu_data = required(locator, f"{prefix}/usr/share/qemu/keymaps/en-us")
-qemu_data = os.path.dirname(os.path.dirname(qemu_data))
 library_path = ":".join(
     [
         os.path.dirname(required(locator, f"{prefix}/lib/x86_64-linux-gnu/libc.so.6")),
@@ -280,14 +291,15 @@ module_dir = os.path.join(
 os.environ["QEMU_MODULE_DIR"] = module_dir
 os.execv(
     loader,
-    [loader, "--library-path", library_path, qemu, "-L", qemu_data, *sys.argv[1:]],
+    [loader, "--library-path", library_path, qemu, *sys.argv[1:]],
 )
 ```
 
-Adjust the representative `libc`, GLib, keymap, and module paths to the exact
-bundle layout. A static launcher can resolve `qemu-system-*` and execute it
-directly. Create a second launcher for `qemu-system-aarch64` when the guest
-architecture requires it.
+Adjust the representative `libc`, GLib, and module paths to the exact bundle
+layout. The launcher deliberately does not add `-L`; the test rule adds the
+location-expanded directory from `qemu_firmware_dir`. A static launcher can
+resolve `qemu-system-*` and execute it directly. Create a second launcher for
+`qemu-system-aarch64` when the guest architecture requires it.
 
 ### 4. Use only declared labels in the test
 
@@ -296,12 +308,22 @@ uefi_test(
     name = "kernel_test",
     arch = "x86_64",
     qemu = "//tools/qemu:qemu_system_x86_64",
+    qemu_firmware_dir = "@qemu_linux_x86_64//:qemu_firmware_dir",
     firmware = "@qemu_linux_x86_64//:firmware/OVMF_CODE.fd",
     firmware_vars = "@qemu_linux_x86_64//:firmware/OVMF_VARS.fd",
     disk = ":kernel_disk",
     timeout_seconds = 60,
 )
 ```
+
+`qemu_firmware_dir` is a label, not a literal directory string. Its target must
+have exactly one default output: an empty marker file located directly in the
+QEMU data directory. Put the runtime closure in that target's `data`, as above.
+The macros location-expand the marker, make the target's runfiles available,
+and pass the marker's parent to QEMU as `-L`. This works in sandboxed and
+remote execution, where a source-tree or host absolute path would not.
+Do not also put `-L` in `qemu_args`; the macros reject that ambiguous
+configuration.
 
 Do not give this target a `no-remote`, `local`, or `manual` tag when it is meant
 to run normally on remote workers. The QEMU bundle must match the platform on

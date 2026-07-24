@@ -99,7 +99,7 @@ jobs:
         run: |
           bazel fetch \
             --lockfile_mode=off \
-            @qemu_noble_x86_64//:runtime
+            @qemu_noble_x86_64//:qemu_firmware_dir
       - name: Exercise real QEMU guests
         run: |
           set +e

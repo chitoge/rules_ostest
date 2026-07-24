@@ -130,6 +130,7 @@ def add_uefi_qemu_arguments(parser: argparse.ArgumentParser) -> None:
     architecture.add_argument("--ostest-arch", choices=("x86_64", "aarch64"))
     architecture.add_argument("--ostest-arch-file")
     group.add_argument("--ostest-qemu", required=True)
+    group.add_argument("--ostest-qemu-firmware-dir")
     group.add_argument("--ostest-firmware")
     group.add_argument("--ostest-firmware-vars")
     group.add_argument("--ostest-boot", choices=("uefi", "direct-kernel"), default="uefi")
@@ -254,6 +255,7 @@ class UefiQemuConfig:
     graphics_device: str | None = None
     allow_reboot: bool = False
     hostfwd: tuple[HostForwardRequest, ...] = ()
+    qemu_firmware_dir: pathlib.Path | None = None
 
     @classmethod
     def from_namespace(
@@ -294,6 +296,13 @@ class UefiQemuConfig:
             raise ValueError("direct-kernel boot requires a kernel")
         if getattr(namespace, "ostest_firmware_vars", None) and not firmware_value:
             raise ValueError("a writable firmware variable store requires firmware")
+        qemu_firmware_dir_value = getattr(namespace, "ostest_qemu_firmware_dir", None)
+        qemu_firmware_dir = None
+        if qemu_firmware_dir_value:
+            qemu_firmware_dir_marker = _locate(locator, qemu_firmware_dir_value)
+            if not qemu_firmware_dir_marker.is_file():
+                raise ValueError("QEMU firmware-directory label must resolve to a marker file")
+            qemu_firmware_dir = qemu_firmware_dir_marker.parent
 
         cpu_model_value = getattr(namespace, "ostest_cpu_model", None)
         cpu_model = None
@@ -310,6 +319,9 @@ class UefiQemuConfig:
                 raise ValueError("graphics_device must not be empty")
             if not graphics:
                 raise ValueError("graphics_device requires graphics to be enabled")
+        qemu_args = tuple(namespace.ostest_qemu_arg)
+        if qemu_firmware_dir is not None and "-L" in qemu_args:
+            raise ValueError("qemu_firmware_dir cannot be combined with -L in qemu_args")
 
         test_tmpdir = pathlib.Path(os.environ["TEST_TMPDIR"])
         media_specs = [json.loads(encoded) for encoded in namespace.ostest_media]
@@ -480,7 +492,7 @@ class UefiQemuConfig:
             gdb=namespace.ostest_gdb,
             pause_at_start=namespace.ostest_pause_at_start,
             machine_options=machine_options,
-            qemu_args=tuple(namespace.ostest_qemu_arg),
+            qemu_args=qemu_args,
             boot=boot,
             kernel=_locate(locator, kernel_value) if kernel_value else None,
             initrd=_locate(locator, initrd_value) if initrd_value else None,
@@ -490,6 +502,7 @@ class UefiQemuConfig:
             graphics_device=graphics_device,
             allow_reboot=bool(getattr(namespace, "ostest_allow_reboot", False)),
             hostfwd=tuple(hostfwd),
+            qemu_firmware_dir=qemu_firmware_dir,
         )
 
     @property
@@ -527,13 +540,17 @@ class UefiQemuConfig:
             str(self.qemu),
             "-no-user-config",
             "-nodefaults",
+        ]
+        if self.qemu_firmware_dir is not None:
+            command.extend(["-L", str(self.qemu_firmware_dir)])
+        command.extend([
             "-machine",
             machine,
             "-m",
             str(self.memory_mb),
             "-smp",
             str(self.cpus),
-        ]
+        ])
         cpu_model = self.cpu_model
         if cpu_model is None and self.arch == "aarch64":
             cpu_model = "cortex-a53" if self.boot == "direct-kernel" else "max"

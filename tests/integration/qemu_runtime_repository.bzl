@@ -28,6 +28,12 @@ filegroup(
 )
 
 filegroup(
+    name = "qemu_firmware_dir",
+    srcs = ["root/usr/share/qemu/.rules_ostest_dir"],
+    data = [":runtime"],
+)
+
+filegroup(
     name = "licenses",
     srcs = glob(["root/usr/share/doc/**/copyright"]),
 )
@@ -79,6 +85,7 @@ _REQUIRED_FILES = [
     "root/usr/share/OVMF/OVMF_VARS_4M.fd",
     "root/usr/share/efi-shell-aa64/shellaa64.efi",
     "root/usr/share/efi-shell-x64/shellx64.efi",
+    "root/usr/share/qemu/.rules_ostest_dir",
     "root/usr/share/qemu/bios-256k.bin",
     "root/usr/share/qemu/efi-virtio.rom",
     "root/usr/share/qemu/pxe-virtio.rom",
@@ -174,6 +181,11 @@ def _qemu_runtime_repository_impl(repository_ctx):
 
     repository_ctx.delete("_packages")
     _link_firmware_data(repository_ctx)
+    repository_ctx.file(
+        "root/usr/share/qemu/.rules_ostest_dir",
+        "",
+        executable = False,
+    )
     for required_file in _REQUIRED_FILES:
         if not repository_ctx.path(required_file).exists:
             fail("QEMU runtime is missing required file %s" % required_file)

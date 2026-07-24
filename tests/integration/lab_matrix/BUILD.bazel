@@ -47,9 +47,11 @@ py_binary(
 real_cirros_lab(
     name = "real_cirros_lab_test",
     qemu = "//tests/integration:qemu_system_x86_64",
+    qemu_firmware_dir = "@qemu_noble_x86_64//:qemu_firmware_dir",
 )
 
 real_cirros_lab(
     name = "real_cirros_lab_tcg_test",
     qemu = ":qemu_system_x86_64_tcg",
+    qemu_firmware_dir = "@qemu_noble_x86_64//:qemu_firmware_dir",
 )

@@ -48,8 +48,6 @@ def main() -> None:
             "--library-path",
             library_path,
             str(qemu),
-            "-L",
-            str(runtime_root / "usr" / "share" / "qemu"),
             *sys.argv[1:],
         ],
     )

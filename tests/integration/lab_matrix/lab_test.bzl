@@ -8,7 +8,7 @@ load(
     "uefi_vm",
 )
 
-def _cirros_vm(name, seed, mac, qemu):
+def _cirros_vm(name, seed, mac, qemu, qemu_firmware_dir):
     return uefi_vm(
         name = name,
         arch = "x86_64",
@@ -40,9 +40,10 @@ def _cirros_vm(name, seed, mac, qemu):
             model = "virtio-net-pci",
         )],
         qemu = qemu,
+        qemu_firmware_dir = qemu_firmware_dir,
     )
 
-def real_cirros_lab(name, qemu):
+def real_cirros_lab(name, qemu, qemu_firmware_dir):
     """Defines one two-guest real CirrOS lab under the selected QEMU wrapper."""
     uefi_lab_test(
         name = name,
@@ -56,7 +57,7 @@ def real_cirros_lab(name, qemu):
         ],
         timeout = "moderate",
         vms = [
-            _cirros_vm("server", ":server_seed", "52:54:00:12:34:10", qemu),
-            _cirros_vm("client", ":client_seed", "52:54:00:12:34:11", qemu),
+            _cirros_vm("server", ":server_seed", "52:54:00:12:34:10", qemu, qemu_firmware_dir),
+            _cirros_vm("client", ":client_seed", "52:54:00:12:34:11", qemu, qemu_firmware_dir),
         ],
     )

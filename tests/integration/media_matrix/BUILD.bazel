@@ -11,6 +11,8 @@ load(
 
 package(default_visibility = ["//visibility:private"])
 
+_QEMU_FIRMWARE_DIR = "@qemu_noble_x86_64//:qemu_firmware_dir"
+
 fat_image(
     name = "seed",
     files = {
@@ -144,6 +146,7 @@ uefi_test(
     ],
     memory_mb = 384,
     qemu = "//tests/integration:qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     success_markers = [
         "OSTEST: MEDIA USERDATA",
         "OSTEST: CDROM READONLY",
@@ -200,6 +203,7 @@ uefi_test(
     ],
     memory_mb = 256,
     qemu = "//tests/integration:qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     success_markers = [
         "Pci(0x5,0x0)/NVMe",
         "USB(0x1,0x0)",
@@ -231,6 +235,7 @@ uefi_test(
     )],
     memory_mb = 128,
     qemu = "//tests/integration:qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     success_markers = [
         "OSTEST: USB READONLY PROBE",
         "OSTEST: USB MEDIA SENTINEL",
@@ -260,6 +265,7 @@ uefi_test(
     )],
     memory_mb = 128,
     qemu = "//tests/integration:qemu_system_x86_64",
+    qemu_firmware_dir = _QEMU_FIRMWARE_DIR,
     success_markers = [
         "OSTEST: NVME READONLY PROBE",
         "OSTEST: NVME MEDIA SENTINEL",

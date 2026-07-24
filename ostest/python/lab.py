@@ -74,6 +74,7 @@ class UefiLabConfig:
                 ostest_machine_option=list(spec.get("machine_options", [])),
                 ostest_pause_at_start=bool(spec.get("pause_at_start", False)),
                 ostest_qemu=str(spec["qemu"]),
+                ostest_qemu_firmware_dir=spec.get("qemu_firmware_dir"),
                 ostest_qemu_arg=list(spec.get("qemu_args", [])),
                 ostest_require_kvm=bool(spec.get("require_kvm", False)),
             )
