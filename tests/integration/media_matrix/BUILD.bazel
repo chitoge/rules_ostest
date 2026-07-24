@@ -111,7 +111,6 @@ uefi_test(
     size = "medium",
     arch = "x86_64",
     boot = "direct-kernel",
-    firmware = None,
     forbidden_markers = ["OSTEST: FAIL"],
     hostfwd = [qemu_hostfwd(
         name = "ssh",

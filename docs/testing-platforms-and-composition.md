@@ -216,11 +216,13 @@ because Bazel has no portable skipped-test status; the target receives the
 ## Direct-kernel boot
 
 All single-VM entry points accept `boot = "direct-kernel"`, a required
-`kernel`, an optional `initrd`, and literal `kernel_args`. Firmware is optional
-in this mode. AArch64 direct boot defaults to `virt,gic-version=2` and
-`cortex-a53`, matching a conservative real-QEMU boot profile; callers may set
-`machine_options` and `cpu_model`. QEMU and all payloads remain declared
-runfiles for the execution worker.
+`kernel`, an optional `initrd`, and literal `kernel_args`. Omit `firmware`
+entirely in this mode; explicitly passing `firmware = None` remains equivalent.
+AArch64 direct boot defaults to `virt,gic-version=2` and `cortex-a53`, matching
+a conservative real-QEMU boot profile; callers may set `machine_options` and
+`cpu_model`. An x86 QEMU machine can still consume SeaBIOS from its runtime data
+directory, but that is part of the QEMU bundle rather than a test `firmware`
+label. QEMU and all payloads remain declared runfiles for the execution worker.
 
 ## Composing disks
 

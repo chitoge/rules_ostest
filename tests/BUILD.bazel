@@ -359,8 +359,31 @@ uefi_test(
     size = "small",
     arch = "aarch64",
     boot = "direct-kernel",
-    firmware = None,
     forbidden_markers = ["ADVANCED-FORBIDDEN"],
+    initrd = "testdata/config.txt",
+    kernel = "testdata/dummy.efi",
+    kernel_args = "console=ttyAMA0 ostest.direct=1",
+    media = [
+        qemu_scratch_disk(
+            name = "state",
+            export = True,
+            size_mb = 1,
+        ),
+    ],
+    qemu = ":fake_advanced_qemu",
+    qemu_args = ["--fake-advanced=direct"],
+    success_markers = [
+        "DIRECT-START",
+        "DIRECT-DONE",
+    ],
+)
+
+uefi_platform_test(
+    name = "qemu_runner_direct_platform_test",
+    size = "small",
+    boot = "direct-kernel",
+    forbidden_markers = ["ADVANCED-FORBIDDEN"],
+    guest_platform = ":guest_aarch64",
     initrd = "testdata/config.txt",
     kernel = "testdata/dummy.efi",
     kernel_args = "console=ttyAMA0 ostest.direct=1",

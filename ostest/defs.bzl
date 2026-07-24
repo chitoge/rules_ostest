@@ -267,7 +267,7 @@ def _validate_hostfwd(hostfwd, qemu_args):
 def uefi_vm(
         name,
         qemu,
-        firmware,
+        firmware = None,
         arch = None,
         guest_platform = None,
         disk = None,
@@ -294,7 +294,7 @@ def uefi_vm(
     Args:
       name: Unique participant name within the lab.
       qemu: Label of the QEMU system executable for the execution platform.
-      firmware: Label of the read-only UEFI firmware-code image.
+      firmware: Optional firmware-code label; required only for UEFI boot.
       arch: Guest architecture name. Exactly one of arch and guest_platform is
         required.
       guest_platform: Bazel platform used to infer and transition guest inputs.
@@ -645,7 +645,7 @@ def uefi_test(
         name,
         arch,
         qemu,
-        firmware,
+        firmware = None,
         disk = None,
         media = [],
         firmware_vars = None,
@@ -693,6 +693,8 @@ def uefi_test(
     KVM is attempted first and QEMU falls back to TCG by default. Set
     require_kvm=True to omit TCG. kvm_unavailable="skip" records a skipped
     JUnit testcase and returns success when the host cannot provide KVM.
+    firmware is required for UEFI boot and may be omitted for direct-kernel
+    boot.
     """
     _define_uefi_test(
         name = name,
@@ -740,7 +742,7 @@ def uefi_platform_test(
         name,
         guest_platform,
         qemu,
-        firmware,
+        firmware = None,
         disk = None,
         media = [],
         firmware_vars = None,
@@ -780,6 +782,8 @@ def uefi_platform_test(
 
     Only guest inputs use the platform transition. The Python/QEMU harness keeps
     its normal configuration so that the test remains executable on its worker.
+    firmware is required for UEFI boot and may be omitted for direct-kernel
+    boot.
     """
     arch_target = name + "__guest_arch"
     _guest_arch_file(
@@ -834,7 +838,7 @@ def uefi_py_test(
         srcs,
         main,
         qemu,
-        firmware,
+        firmware = None,
         disk = None,
         media = [],
         arch = None,
@@ -872,7 +876,7 @@ def uefi_py_test(
       srcs: Python source labels passed to py_test.
       main: Python entry point passed to py_test.
       qemu: Label of the QEMU system executable for the execution platform.
-      firmware: Label of the read-only UEFI firmware-code image.
+      firmware: Optional firmware-code label; required only for UEFI boot.
       disk: Optional raw boot disk shorthand with boot index 1.
       media: List of qemu_media configurations.
       arch: Guest architecture name. Exactly one of arch and guest_platform is

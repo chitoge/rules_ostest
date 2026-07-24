@@ -24,5 +24,7 @@ Notable user-visible changes are recorded here.
 - Add a development-only, SHA-256-locked Ubuntu snapshot closure for real
   QEMU, SeaBIOS/iPXE firmware data, OVMF/AAVMF, and EFI Shell integration tests
   without host installation.
+- Allow direct-kernel callers to omit the `firmware` argument from every
+  single-VM entry point.
 - Document Git-only consumption and distinguish the repository's pinned test
   runtime from consumer-owned remote-execution bundles.

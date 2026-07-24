@@ -92,9 +92,10 @@ repository cache.
 
 The launcher resolves QEMU through Bazel runfiles, invokes the pinned closure's
 own ELF loader, and supplies only its declared library and QEMU-data paths.
-The data view includes the closure's SeaBIOS and iPXE option ROMs, so
-direct-kernel guests do not fall back to host firmware paths. The launcher
-never searches `PATH`. OVMF/AAVMF and the EFI Shell are labels from the same
+The data view includes the closure's SeaBIOS and iPXE option ROMs, so QEMU does
+not fall back to host firmware-data paths. These runtime files do not make the
+test-level `firmware` label mandatory for direct-kernel boot. The launcher never
+searches `PATH`. OVMF/AAVMF and the EFI Shell are labels from the same
 repository. This makes the inputs content-pinned; the Linux kernel ABI and the
 sandbox's process/socket/resource policy remain execution-platform
 requirements.

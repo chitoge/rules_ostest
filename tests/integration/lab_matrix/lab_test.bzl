@@ -13,7 +13,6 @@ def _cirros_vm(name, seed, mac, qemu):
         name = name,
         arch = "x86_64",
         boot = "direct-kernel",
-        firmware = None,
         initrd = "@cirros_x86_64_initramfs//file",
         kernel = "@cirros_x86_64_kernel//file",
         kernel_args = "console=ttyS0 root=/dev/vda1 ro",
