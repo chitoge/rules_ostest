@@ -5,6 +5,7 @@ exports_files([
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "LICENSE",
+    "MODULE.bazel",
     "NOTICE",
     "README.md",
     "SECURITY.md",

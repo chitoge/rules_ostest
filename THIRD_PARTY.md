@@ -40,15 +40,15 @@ redistribute those binaries. It launches QEMU as a separate process and
 communicates through command-line arguments, byte streams, QMP sockets, and
 network sockets.
 
-For this repository's own manual tests, the root module defines a
-development-only Bazel repository backed by Ubuntu's
+The public opt-in QEMU runtime repository rule is backed by Ubuntu's
 `20260720T000000Z` Noble snapshot. The checked lock records 90 exact package
 URLs and SHA-256 digests covering QEMU 8.2.2, its dynamic runtime closure,
 SeaBIOS, iPXE option ROMs, OVMF, AAVMF, prebuilt TianoCore EFI Shell binaries
 for x86-64 and AArch64, and package copyright notices. Bazel downloads and
 extracts those packages into its external-repository area; they are not copied
-into the Git tree or uploaded as release artifacts. No EDK II or guest build
-toolchain is used.
+into the Git tree or uploaded as release artifacts. The root module instantiates
+this rule only as a development dependency for its manual integration tests;
+consumers must opt in themselves. No EDK II or guest build toolchain is used.
 
 `rules_distroless` v0.5.1 is used only by the disposable lock-update helper to
 resolve the Ubuntu package graph. It is not a direct module dependency or a

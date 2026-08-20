@@ -41,7 +41,7 @@ guest operating-system images, QEMU executables, or real firmware images. The
 QEMU YAML manifest and JSON lock are provenance metadata, not binaries.
 
 To change the integration runtime, edit
-`tests/integration/qemu_noble.yaml`, run
+`ostest/qemu_noble.yaml`, run
 `tools/update_qemu_runtime_lock.sh`, review every package/version/URL/hash
 change, and run the lock test plus the complete real-QEMU matrix documented in
 the setup guide. The updater uses a disposable, pinned dependency resolver; it

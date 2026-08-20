@@ -87,7 +87,7 @@ bazel test \
 The first command materializes 90 packages from Ubuntu's official
 `20260720T000000Z` Noble snapshot. The package graph, version, URL, and SHA-256
 of every archive are checked into
-`tests/integration/qemu_noble.lock.json`. The repository rule extracts the
+`ostest/qemu_noble.lock.json`. The repository rule extracts the
 archives under Bazel's external-repository directory; it does not write
 binaries into the source checkout. Subsequent workspaces can reuse Bazel's
 repository cache.
@@ -122,7 +122,7 @@ default/metadata job is not evidence that real guests ran.
 
 ### Update the pinned runtime
 
-Edit `tests/integration/qemu_noble.yaml` to change the snapshot or requested
+Edit `ostest/qemu_noble.yaml` to change the snapshot or requested
 packages, then run:
 
 ```sh
@@ -137,13 +137,64 @@ the project's Bazel 8.7+ support floor. Review every changed package, version,
 snapshot URL, and digest in the generated lock. Then run the complete real
 matrix before committing. Do not hand-edit the JSON lock.
 
+## Use the maintained Noble runtime from a consumer (explicit opt-in)
+
+The same repository rule is a supported public API, but it is never
+instantiated merely by depending on `rules_ostest`. After pinning
+`rules_ostest` to a full Git commit as shown above, a consuming root module
+opts in explicitly:
+
+```starlark
+qemu_runtime_repository = use_repo_rule(
+    "@rules_ostest//ostest:qemu_runtime_repository.bzl",
+    "qemu_runtime_repository",
+)
+
+qemu_runtime_repository(
+    name = "qemu_noble_x86_64",
+    lock = "@rules_ostest//ostest:qemu_noble.lock.json",
+)
+```
+
+This creates no repository until a target references one of its labels. The
+stable labels are `@qemu_noble_x86_64//:qemu_system_x86_64`,
+`:qemu_system_aarch64`, `:qemu_firmware_dir`, `:ovmf_code`, `:ovmf_vars`,
+`:runtime`, `:licenses`, and `:PACKAGES.txt`. Raw firmware and binary path
+labels remain public too, for example
+`@qemu_noble_x86_64//:root/usr/share/OVMF/OVMF_CODE_4M.fd`.
+
+The checked-in lock is an amd64 90-package closure from one immutable Ubuntu
+snapshot. The rule rejects a non-lowercase SHA-256, duplicate package key or
+name/version/architecture identity, unlocked dependency edge, a different
+snapshot prefix, or a shortened closure before it downloads anything. It does
+not minimize the runtime closure. `PACKAGES.txt` is emitted deterministically
+from the accepted lock and records each archive URL and digest; `:licenses`
+contains the corresponding Ubuntu copyright notices.
+
+A consumer can own a reviewed copy of the lock instead:
+
+```starlark
+qemu_runtime_repository(
+    name = "qemu_noble_x86_64",
+    lock = "//third_party:qemu_noble.lock.json",
+)
+```
+
+Record the full `rules_ostest` Git commit, the SHA-256 of that exact lock, and
+the resulting `:PACKAGES.txt` beside the consumer's test evidence. The
+upstream lock digest is recorded in
+`@rules_ostest//ostest:qemu_noble.lock.sha256`; it is a reproducibility aid,
+not a substitute for reviewing a consumer-owned lock. The generated launchers
+execute only the declared loader, libraries, QEMU data, and binary closure;
+they do not search `PATH`. This API supplies bytes and labels only. It does
+not qualify remote workers, launch a VM by itself, or promise KVM/TCG support.
+
 ## Supply QEMU from a consuming repository
 
-The root module's development-only QEMU repository is not instantiated when
-`rules_ostest` is consumed as a dependency. A consumer should own its emulator
-version and execution-platform contract. The following pattern keeps that
-runtime outside `rules_ostest` while making every byte needed by the test a
-declared, content-pinned input.
+The root module instantiates the public rule only as a development dependency
+for its manual tests; it is not instantiated when `rules_ostest` is consumed
+as a dependency. A consumer that needs another emulator version or execution
+platform contract can instead own the following fully declared bundle.
 
 ### 1. Produce a runtime bundle
 

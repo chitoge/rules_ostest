@@ -4,4 +4,8 @@ exports_files([
     "defs.bzl",
     "images.bzl",
     "platforms.bzl",
+    "qemu_noble.lock.json",
+    "qemu_noble.lock.sha256",
+    "qemu_noble.yaml",
+    "qemu_runtime_repository.bzl",
 ])

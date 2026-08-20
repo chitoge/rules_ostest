@@ -1,0 +1,25 @@
+module(
+    name = "rules_ostest_qemu_runtime_consumer",
+    version = "0.0.0",
+)
+
+# This fixture is a separate root module. The local override intentionally
+# exercises the checked-out public API; released consumers use a full-SHA
+# git_override as documented in docs/getting-started.md.
+bazel_dep(name = "rules_ostest", version = "0.1.0")
+local_path_override(
+    module_name = "rules_ostest",
+    path = "../..",
+)
+
+qemu_runtime_repository = use_repo_rule(
+    "@rules_ostest//ostest:qemu_runtime_repository.bzl",
+    "qemu_runtime_repository",
+)
+
+# The fixture intentionally reuses the exported upstream lock. A production
+# consumer may instead own a reviewed copy at a root-module label.
+qemu_runtime_repository(
+    name = "qemu_noble_x86_64",
+    lock = "@rules_ostest//ostest:qemu_noble.lock.json",
+)
