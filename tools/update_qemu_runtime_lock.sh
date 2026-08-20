@@ -24,7 +24,7 @@ git -C "${runtime_resolver_root}" checkout --quiet --detach FETCH_HEAD
 runtime_manifest_dir="${runtime_resolver_root}/examples/rules_ostest_qemu"
 mkdir -- "${runtime_manifest_dir}"
 cp -- \
-    "${runtime_project_root}/tests/integration/qemu_noble.yaml" \
+    "${runtime_project_root}/ostest/qemu_noble.yaml" \
     "${runtime_manifest_dir}/qemu_noble.yaml"
 
 cat >"${runtime_manifest_dir}/BUILD.bazel" <<'EOF'
@@ -94,6 +94,11 @@ curl --fail --location --silent --show-error \
 
 cp -- \
     "${runtime_manifest_dir}/qemu_noble.lock.json" \
-    "${runtime_project_root}/tests/integration/qemu_noble.lock.json"
+    "${runtime_project_root}/ostest/qemu_noble.lock.json"
 
-echo "Updated tests/integration/qemu_noble.lock.json"
+(
+    cd -- "${runtime_project_root}/ostest"
+    sha256sum qemu_noble.lock.json >qemu_noble.lock.sha256
+)
+
+echo "Updated ostest/qemu_noble.lock.json and ostest/qemu_noble.lock.sha256"

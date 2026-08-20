@@ -1,6 +1,8 @@
-"""Creates the pinned, test-only QEMU runtime used by integration tests."""
+"""Creates a content-pinned public QEMU/firmware runtime repository."""
 
 _BUILD_FILE = """\
+load(":qemu_launcher.bzl", "qemu_launcher")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
@@ -37,9 +39,135 @@ filegroup(
     name = "licenses",
     srcs = glob(["root/usr/share/doc/**/copyright"]),
 )
+
+alias(
+    name = "ovmf_code",
+    actual = ":root/usr/share/OVMF/OVMF_CODE_4M.fd",
+)
+
+alias(
+    name = "ovmf_vars",
+    actual = ":root/usr/share/OVMF/OVMF_VARS_4M.fd",
+)
+
+alias(
+    name = "aavmf_code",
+    actual = ":root/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
+)
+
+alias(
+    name = "aavmf_vars",
+    actual = ":root/usr/share/AAVMF/AAVMF_VARS.fd",
+)
+
+alias(
+    name = "efi_shell_x64",
+    actual = ":root/usr/share/efi-shell-x64/shellx64.efi",
+)
+
+alias(
+    name = "efi_shell_aa64",
+    actual = ":root/usr/share/efi-shell-aa64/shellaa64.efi",
+)
+
+qemu_launcher(
+    name = "qemu_system_x86_64",
+    licenses = ":licenses",
+    packages = "PACKAGES.txt",
+    runtime = ":runtime",
+    script = "qemu_system_x86_64.sh",
+)
+
+qemu_launcher(
+    name = "qemu_system_aarch64",
+    licenses = ":licenses",
+    packages = "PACKAGES.txt",
+    runtime = ":runtime",
+    script = "qemu_system_aarch64.sh",
+)
 """
 
+_LAUNCHER_RULE = """\
+\"\"\"Minimal self-contained executable rule for generated QEMU launchers.\"\"\"
+
+def _qemu_launcher_impl(ctx):
+    script = ctx.executable.script
+    launcher = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.symlink(
+        output = launcher,
+        target_file = script,
+        is_executable = True,
+    )
+    runfiles = ctx.runfiles(files = [ctx.file.packages, script])
+    runfiles = runfiles.merge(ctx.runfiles(files = ctx.files.runtime))
+    runfiles = runfiles.merge(ctx.runfiles(files = ctx.files.licenses))
+    return [DefaultInfo(executable = launcher, runfiles = runfiles)]
+
+qemu_launcher = rule(
+    implementation = _qemu_launcher_impl,
+    executable = True,
+    attrs = {
+        "licenses": attr.label(allow_files = True),
+        "packages": attr.label(allow_single_file = True),
+        "runtime": attr.label(allow_files = True),
+        "script": attr.label(
+            allow_single_file = True,
+            cfg = "exec",
+            executable = True,
+        ),
+    },
+)
+"""
+
+_LAUNCHER = """\
+#!/bin/sh
+# Executes one QEMU binary using only this repository's declared closure.
+set -eu
+
+repository=\"__RULES_OSTEST_REPOSITORY__\"
+qemu_binary=\"__RULES_OSTEST_QEMU_BINARY__\"
+
+# bazel run may invoke the executable symlink directly rather than exporting
+# RUNFILES_DIR. Derive Bazel's sibling runfiles tree without consulting PATH.
+if [ -z \"${RUNFILES_DIR:-}\" ] && [ -d \"$0.runfiles\" ]; then
+    RUNFILES_DIR=\"$0.runfiles\"
+fi
+if [ -z \"${RUNFILES_MANIFEST_FILE:-}\" ] && [ -f \"$0.runfiles_manifest\" ]; then
+    RUNFILES_MANIFEST_FILE=\"$0.runfiles_manifest\"
+fi
+
+runfile() {
+    key=\"$1\"
+    if [ -n \"${RUNFILES_DIR:-}\" ] && [ -e \"${RUNFILES_DIR}/${key}\" ]; then
+        printf '%s\\n' \"${RUNFILES_DIR}/${key}\"
+        return 0
+    fi
+    if [ -n \"${RUNFILES_MANIFEST_FILE:-}\" ]; then
+        while IFS=' ' read -r manifest_key manifest_path; do
+            if [ \"${manifest_key}\" = \"${key}\" ]; then
+                printf '%s\\n' \"${manifest_path}\"
+                return 0
+            fi
+        done < \"${RUNFILES_MANIFEST_FILE}\"
+    fi
+    printf '%s\\n' \"QEMU runtime runfile is missing: ${key}\" >&2
+    return 1
+}
+
+loader=$(runfile \"${repository}/root/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2\")
+qemu=$(runfile \"${repository}/root/usr/bin/${qemu_binary}\")
+runtime_root=${loader%/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2}
+library_path=\"${runtime_root}/lib/x86_64-linux-gnu:${runtime_root}/usr/lib/x86_64-linux-gnu\"
+export QEMU_MODULE_DIR=\"${runtime_root}/usr/lib/x86_64-linux-gnu/qemu\"
+exec \"${loader}\" --library-path \"${library_path}\" \"${qemu}\" \"$@\"
+"""
+
+def _launcher_source(repository_name, qemu_binary):
+    return _LAUNCHER.replace("__RULES_OSTEST_REPOSITORY__", repository_name).replace("__RULES_OSTEST_QEMU_BINARY__", qemu_binary)
+
 _SNAPSHOT_PREFIX = "https://snapshot.ubuntu.com/ubuntu/20260720T000000Z/"
+_EXPECTED_PACKAGE_COUNT = 90
+_LOWER_HEX = "0123456789abcdef"
 _FIRMWARE_DATA = {
     "root/usr/lib/ipxe/qemu": [
         "efi-e1000.rom",
@@ -92,13 +220,16 @@ _REQUIRED_FILES = [
 ]
 
 def _validate_package(package):
-    for field in ["arch", "name", "sha256", "urls", "version"]:
+    for field in ["arch", "dependencies", "key", "name", "sha256", "urls", "version"]:
         if field not in package:
             fail("QEMU runtime lock package is missing %r" % field)
 
     sha256 = package["sha256"]
     if len(sha256) != 64:
         fail("invalid SHA-256 for QEMU runtime package %s" % package["name"])
+    for index in range(len(sha256)):
+        if sha256[index] not in _LOWER_HEX:
+            fail("invalid SHA-256 for QEMU runtime package %s" % package["name"])
 
     if package["arch"] != "amd64":
         fail("QEMU runtime package %s is not locked for amd64" % package["name"])
@@ -106,6 +237,36 @@ def _validate_package(package):
         fail("QEMU runtime package %s must have exactly one URL" % package["name"])
     if not package["urls"][0].startswith(_SNAPSHOT_PREFIX):
         fail("QEMU runtime package %s is not from the pinned snapshot" % package["name"])
+
+def _validate_lock(packages):
+    """Rejects a truncated or ambiguous package closure before downloading it."""
+
+    if len(packages) != _EXPECTED_PACKAGE_COUNT:
+        fail(
+            "QEMU runtime lock must preserve the %d-package Noble closure, got %d" %
+            (_EXPECTED_PACKAGE_COUNT, len(packages)),
+        )
+
+    keys = {}
+    identities = {}
+    for package in packages:
+        _validate_package(package)
+        key = package["key"]
+        identity = "%s|%s|%s" % (package["name"], package["version"], package["arch"])
+        if key in keys:
+            fail("QEMU runtime lock has duplicate package key %s" % key)
+        if identity in identities:
+            fail("QEMU runtime lock has duplicate package identity %s" % identity)
+        keys[key] = True
+        identities[identity] = True
+
+    for package in packages:
+        for dependency in package["dependencies"]:
+            if "key" not in dependency or dependency["key"] not in keys:
+                fail(
+                    "QEMU runtime package %s has an unlocked dependency %s" %
+                    (package["name"], dependency.get("name", "<unnamed>")),
+                )
 
 def _find_data_archive(repository_ctx, package_dir, package_name):
     archives = [
@@ -141,13 +302,13 @@ def _qemu_runtime_repository_impl(repository_ctx):
     packages = lock.get("packages", [])
     if not packages:
         fail("QEMU runtime lock contains no packages")
+    _validate_lock(packages)
 
     manifest = [
         "# Generated from %s; do not edit.\n" % repository_ctx.attr.lock,
         "# NAME\tVERSION\tARCH\tSHA256\tURL\n",
     ]
     for index, package in enumerate(packages):
-        _validate_package(package)
         repository_ctx.report_progress(
             "Fetching pinned QEMU runtime package %d/%d: %s" %
             (index + 1, len(packages), package["name"]),
@@ -190,6 +351,17 @@ def _qemu_runtime_repository_impl(repository_ctx):
         if not repository_ctx.path(required_file).exists:
             fail("QEMU runtime is missing required file %s" % required_file)
     repository_ctx.file("PACKAGES.txt", "".join(manifest), executable = False)
+    repository_ctx.file(
+        "qemu_system_x86_64.sh",
+        _launcher_source(repository_ctx.name, "qemu-system-x86_64"),
+        executable = True,
+    )
+    repository_ctx.file(
+        "qemu_system_aarch64.sh",
+        _launcher_source(repository_ctx.name, "qemu-system-aarch64"),
+        executable = True,
+    )
+    repository_ctx.file("qemu_launcher.bzl", _LAUNCHER_RULE, executable = False)
     repository_ctx.file("BUILD.bazel", _BUILD_FILE, executable = False)
 
 qemu_runtime_repository = repository_rule(

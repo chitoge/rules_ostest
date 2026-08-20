@@ -9,8 +9,9 @@ The library rules keep emulators and firmware outside their implementation.
 Image actions do not need QEMU. A real guest test receives QEMU and any UEFI
 firmware as explicit Bazel labels; `qemu_firmware_dir` declares an emulator's
 external BIOS and option-ROM data when needed. This repository's manual
-integration targets use a test-only, content-pinned runtime; consumers remain
-free to supply their own.
+integration targets use the same explicit opt-in, content-pinned runtime
+repository rule exposed to consumers; consumers remain free to supply their
+own reviewed runtime instead.
 
 ## Highlights
 
@@ -129,9 +130,9 @@ uefi_test(
 ```
 
 The QEMU and firmware labels are consumer examples from the hermetic bundle
-pattern in the setup guide. The repository defines a development-only runtime
-for its own integration tests, but does not redistribute its binaries or make
-that runtime part of the consumed rules module.
+pattern in the setup guide. The repository exposes an explicit opt-in runtime
+repository rule, but does not redistribute its downloaded binaries or
+instantiate that runtime for a consumer that merely depends on the module.
 
 The legacy default protocol accepts `OSTEST: PASS` and rejects `OSTEST: FAIL`.
 Tests can instead use regular expressions, ordered markers, or reboot phases.

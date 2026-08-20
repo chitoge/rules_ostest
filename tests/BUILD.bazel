@@ -221,12 +221,91 @@ py_test(
     size = "small",
     srcs = ["qemu_runtime_lock_test.py"],
     args = [
-        "--lock=$(rlocationpath //tests/integration:qemu_noble.lock.json)",
+        "--lock=$(rlocationpath //ostest:qemu_noble.lock.json)",
     ],
-    data = ["//tests/integration:qemu_noble.lock.json"],
+    data = ["//ostest:qemu_noble.lock.json"],
     legacy_create_init = 0,
     python_version = "3.12",
     deps = ["@rules_python//python/runfiles"],
+)
+
+py_test(
+    name = "qemu_runtime_public_api_test",
+    size = "small",
+    srcs = ["qemu_runtime_public_api_test.py"],
+    args = [
+        "--module=$(rlocationpath //:MODULE.bazel)",
+        "--repository-rule=$(rlocationpath //ostest:qemu_runtime_repository.bzl)",
+        "--lock=$(rlocationpath //ostest:qemu_noble.lock.json)",
+        "--lock-digest=$(rlocationpath //ostest:qemu_noble.lock.sha256)",
+        "--integration-build=$(rlocationpath //tests/integration:BUILD.bazel)",
+        "--consumer-module=$(rlocationpath //tests/qemu_runtime_consumer:MODULE.bazel)",
+        "--consumer-build=$(rlocationpath //tests/qemu_runtime_consumer:BUILD.bazel)",
+    ],
+    data = [
+        "//:MODULE.bazel",
+        "//ostest:qemu_noble.lock.json",
+        "//ostest:qemu_noble.lock.sha256",
+        "//ostest:qemu_runtime_repository.bzl",
+        "//tests/integration:BUILD.bazel",
+        "//tests/qemu_runtime_consumer:BUILD.bazel",
+        "//tests/qemu_runtime_consumer:MODULE.bazel",
+    ],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    deps = ["@rules_python//python/runfiles"],
+)
+
+# This validation materializes the intentional full package closure. It is
+# manual so default unit-test latency stays small; CI can select it explicitly.
+py_test(
+    name = "qemu_runtime_extracted_provenance_test",
+    size = "medium",
+    srcs = ["qemu_runtime_extracted_provenance_test.py"],
+    args = [
+        "--lock=$(rlocationpath //ostest:qemu_noble.lock.json)",
+        "--packages=$(rlocationpath @qemu_noble_x86_64//:PACKAGES.txt)",
+    ],
+    data = [
+        "//ostest:qemu_noble.lock.json",
+        "@qemu_noble_x86_64//:PACKAGES.txt",
+        "@qemu_noble_x86_64//:licenses",
+    ],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    tags = ["manual"],
+    deps = ["@rules_python//python/runfiles"],
+)
+
+# A narrow no-VM probe for the generated launcher. It clears PATH before
+# execution so the QEMU closure must provide its own loader and libraries.
+py_test(
+    name = "qemu_runtime_launcher_test",
+    size = "medium",
+    srcs = ["qemu_runtime_launcher_test.py"],
+    args = [
+        "--qemu=$(rlocationpath @qemu_noble_x86_64//:qemu_system_x86_64)",
+    ],
+    data = ["@qemu_noble_x86_64//:qemu_system_x86_64"],
+    legacy_create_init = 0,
+    python_version = "3.12",
+    tags = ["manual"],
+    deps = ["@rules_python//python/runfiles"],
+)
+
+# This build-only analysis probe exercises public labels from the repository
+# rule without executing QEMU or a virtual machine.
+filegroup(
+    name = "qemu_runtime_public_alias_analysis",
+    srcs = [
+        "@qemu_noble_x86_64//:PACKAGES.txt",
+        "@qemu_noble_x86_64//:licenses",
+        "@qemu_noble_x86_64//:ovmf_code",
+        "@qemu_noble_x86_64//:ovmf_vars",
+        "@qemu_noble_x86_64//:qemu_firmware_dir",
+        "@qemu_noble_x86_64//:qemu_system_x86_64",
+        "@qemu_noble_x86_64//:runtime",
+    ],
 )
 
 py_binary(

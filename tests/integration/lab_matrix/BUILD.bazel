@@ -1,9 +1,10 @@
-load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
 load(
     "//ostest:defs.bzl",
     "fat_image",
 )
 load(":lab_test.bzl", "real_cirros_lab")
+load(":tcg_qemu_wrapper.bzl", "tcg_qemu_wrapper")
 
 package(default_visibility = ["//visibility:private"])
 
@@ -35,13 +36,26 @@ fat_image(
     volume_label = "cidata",
 )
 
-py_binary(
+tcg_qemu_wrapper(
     name = "qemu_system_x86_64_tcg",
-    srcs = ["qemu_system_x86_64_tcg.py"],
-    data = ["//tests/integration:qemu_system_x86_64"],
+    qemu = "//tests/integration:qemu_system_x86_64",
+)
+
+py_test(
+    name = "qemu_system_x86_64_tcg_downstream_test",
+    size = "medium",
+    srcs = ["qemu_system_x86_64_tcg_downstream_test.py"],
+    args = [
+        "--qemu=$(rlocationpath :qemu_system_x86_64_tcg)",
+    ],
+    data = [":qemu_system_x86_64_tcg"],
     legacy_create_init = 0,
-    main = "qemu_system_x86_64_tcg.py",
     python_version = "3.12",
+    tags = [
+        "manual",
+        "no-remote",
+    ],
+    deps = ["@rules_python//python/runfiles"],
 )
 
 real_cirros_lab(

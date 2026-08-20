@@ -120,6 +120,7 @@ jobs:
             //tests/integration/media_matrix:real_efi_shell_media_test \
             //tests/integration/media_matrix:real_efi_shell_usb_readonly_test \
             //tests/integration/media_matrix:real_efi_shell_nvme_readonly_test \
+            //tests/integration/lab_matrix:qemu_system_x86_64_tcg_downstream_test \
             //tests/integration/lab_matrix:real_cirros_lab_tcg_test \
             2>&1 | tee "${RUNNER_TEMP}/real-qemu.log"
           bazel_status=${PIPESTATUS[0]}

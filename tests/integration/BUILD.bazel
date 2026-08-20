@@ -13,12 +13,9 @@ load(
 
 package(default_visibility = ["//visibility:private"])
 
-_QEMU_FIRMWARE_DIR = "@qemu_noble_x86_64//:qemu_firmware_dir"
+exports_files(["BUILD.bazel"])
 
-exports_files([
-    "qemu_noble.lock.json",
-    "qemu_noble.yaml",
-])
+_QEMU_FIRMWARE_DIR = "@qemu_noble_x86_64//:qemu_firmware_dir"
 
 alias(
     name = "efi_shell_x64",
@@ -151,41 +148,16 @@ alias(
     actual = "@qemu_noble_x86_64//:root/usr/share/AAVMF/AAVMF_VARS.fd",
 )
 
-py_binary(
+alias(
     name = "qemu_system_x86_64",
-    srcs = ["qemu_system_x86_64.py"],
-    data = [
-        "@qemu_noble_x86_64//:PACKAGES.txt",
-        "@qemu_noble_x86_64//:licenses",
-        "@qemu_noble_x86_64//:runtime",
-    ],
-    legacy_create_init = 0,
-    main = "qemu_system_x86_64.py",
-    python_version = "3.12",
-    target_compatible_with = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
-    ],
+    actual = "@qemu_noble_x86_64//:qemu_system_x86_64",
     visibility = ["//tests/integration:__subpackages__"],
-    deps = ["@rules_python//python/runfiles"],
 )
 
-py_binary(
+alias(
     name = "qemu_system_aarch64",
-    srcs = ["qemu_system_aarch64.py"],
-    data = [
-        "@qemu_noble_x86_64//:PACKAGES.txt",
-        "@qemu_noble_x86_64//:licenses",
-        "@qemu_noble_x86_64//:runtime",
-    ],
-    legacy_create_init = 0,
-    main = "qemu_system_aarch64.py",
-    python_version = "3.12",
-    target_compatible_with = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
-    ],
-    deps = ["@rules_python//python/runfiles"],
+    actual = "@qemu_noble_x86_64//:qemu_system_aarch64",
+    visibility = ["//tests/integration:__subpackages__"],
 )
 
 py_binary(

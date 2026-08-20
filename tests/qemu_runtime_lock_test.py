@@ -28,6 +28,7 @@ _REQUIRED_PACKAGES = {
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _SNAPSHOT_PREFIX = "https://snapshot.ubuntu.com/ubuntu/20260720T000000Z/"
+_PACKAGE_COUNT = 90
 
 
 class QemuRuntimeLockTest(unittest.TestCase):
@@ -52,9 +53,16 @@ class QemuRuntimeLockTest(unittest.TestCase):
         self.assertIsInstance(packages, list)
         self.assertTrue(packages)
 
+        self.assertEqual(len(packages), _PACKAGE_COUNT)
         names = [package["name"] for package in packages]
-        self.assertEqual(len(names), len(set(names)))
         self.assertLessEqual(_REQUIRED_PACKAGES, set(names))
+        keys = [package["key"] for package in packages]
+        self.assertEqual(len(keys), len(set(keys)))
+        identities = [
+            (package["name"], package["version"], package["arch"])
+            for package in packages
+        ]
+        self.assertEqual(len(identities), len(set(identities)))
 
     def test_every_archive_is_immutable(self) -> None:
         for package in self.lock["packages"]:
